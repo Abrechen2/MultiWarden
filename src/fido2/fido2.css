@@ -1,0 +1,132 @@
+.fido2 main {
+  padding: 16px 16px 10px;
+}
+.fido2-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.fido2-head h1 {
+  font-size: 17px;
+  margin: 0;
+}
+.fido2-head .site {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.fido2-head .grow {
+  flex: 1;
+  min-width: 0;
+}
+.fido2 .origin {
+  margin: 0 0 14px;
+  word-break: break-all;
+}
+.fido2 .card.list {
+  padding: 4px;
+  margin-bottom: 12px;
+}
+.fido2 .card.list .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.fido2 .card.list .row:hover {
+  background: var(--surface-2);
+}
+.fido2 .card.list .row.on {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.fido2 .row .pk {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  color: var(--primary);
+  flex: none;
+}
+.fido2 .row .txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fido2 .row .txt b,
+.fido2 .row .txt small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fido2 .row .txt small {
+  color: var(--text-muted);
+}
+.fido2 .card.who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.fido2 .card.who .grow {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fido2 select {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+}
+.fido2 .alt {
+  display: block;
+  margin: 6px auto 0;
+}
+.fido2 .verify {
+  margin: 4px 0 10px;
+}
+.fido2 .unlock-box {
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.fido2 .acct-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.fido2 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.fido2 .footer-bar {
+  gap: 8px;
+  justify-content: flex-end;
+}

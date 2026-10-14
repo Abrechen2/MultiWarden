@@ -1,0 +1,164 @@
+:root {
+  --bg: #ffffff;
+  --hover: #edf2f9;
+  --text: #1b2433;
+  --muted: #5a6880;
+  --border: #d5dde8;
+  --primary: #175ddc;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #172234;
+    --hover: #22324b;
+    --text: #e4ebf5;
+    --muted: #a2b0c6;
+    --border: #2f4058;
+    --primary: #84aef5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #172234;
+  --hover: #22324b;
+  --text: #e4ebf5;
+  --muted: #a2b0c6;
+  --border: #2f4058;
+  --primary: #84aef5;
+  color-scheme: dark;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font:
+    13.5px/1.35 "Inter",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    Roboto,
+    Arial,
+    sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+.menu {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.menu.loading {
+  height: 0;
+  border: 0;
+  padding: 0;
+}
+button {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+button:hover,
+button:focus-visible {
+  background: var(--hover);
+}
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+button[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+.txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.txt b,
+.txt small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.txt b {
+  font-weight: 600;
+}
+.txt small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.fav {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  flex: none;
+  object-fit: contain;
+}
+.fav.ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px 0 4px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border: 1px solid;
+  flex: none;
+}
+.badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.more .txt small {
+  text-align: center;
+}
+.fav.ph.pk {
+  color: #175ddc;
+}
+.gen-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.gen-row .entry {
+  flex: 1;
+  min-width: 0;
+}
+button.icon {
+  width: auto;
+  flex: none;
+  padding: 7px;
+  color: var(--muted);
+}
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+button.new {
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 7px 7px;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 12.5px;
+  gap: 8px;
+  padding: 8px 9px 7px;
+}
