@@ -10,14 +10,7 @@
 </p>
 
 <p align="center">
-  <b>English</b> · <a href="README.de.md">Deutsch</a>
-</p>
-
-<p align="center">
   <img src="docs/screenshots/vault.png" width="300" alt="Vault with autofill suggestions from three accounts">
-  <img src="docs/screenshots/inline-menu.png" width="340" alt="Inline menu in a login field">
-  <img src="docs/screenshots/item-dark.png" width="300" alt="Item in the dark Tuvia theme">
-  <img src="docs/screenshots/tools-send.png" width="300" alt="Tools: Send in the dark Tuvia theme">
 </p>
 
 > [!NOTE]
