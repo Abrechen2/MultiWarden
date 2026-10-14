@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Lieferadresse</title>
+<style>body{font-family:system-ui;background:#f4f6fa;padding:30px}form{background:#fff;padding:22px;border-radius:12px;width:420px}table td{padding:4px}input,select{padding:6px;border:1px solid #bcc6d4;border-radius:6px}</style></head>
+<body>
+<form id="addr"><h3>Lieferadresse</h3>
+<table>
+<tr><td>Anrede</td><td><select id="anrede" name="salutation"><option value="">–</option><option value="m">Herr</option><option value="f">Frau</option><option value="d">Divers</option></select></td></tr>
+<tr><td><label for="vn">Vorname</label></td><td><input id="vn" name="vorname"></td></tr>
+<tr><td><label for="nn">Nachname</label></td><td><input id="nn" name="nachname"></td></tr>
+<tr><td><label for="firma">Firma (optional)</label></td><td><input id="firma" name="firma"></td></tr>
+<tr><td><label for="str">Straße</label></td><td><input id="str" name="strasse"> <input id="hnr" name="nr" size="4" aria-label="Nr."></td></tr>
+<tr><td><label for="plz">PLZ</label></td><td><input id="plz" name="plz" maxlength="5"></td></tr>
+<tr><td><label for="ort">Ort</label></td><td><input id="ort" name="ort"></td></tr>
+<tr><td><label for="land">Land</label></td><td><select id="land" name="land"><option value="">Bitte wählen</option><option value="AT">Österreich</option><option value="DE">Deutschland</option><option value="CH">Schweiz</option></select></td></tr>
+<tr><td><label for="mail">E-Mail-Adresse</label></td><td><input id="mail" type="email" name="email"></td></tr>
+<tr><td><label for="tel">Telefon</label></td><td><input id="tel" type="tel" name="telefon"></td></tr>
+</table>
+<button type="submit">Weiter</button></form></body></html>

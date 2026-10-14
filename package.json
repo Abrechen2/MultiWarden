@@ -1,0 +1,31 @@
+{
+  "name": "multiwarden",
+  "version": "1.4.0",
+  "description": "Multi-Account-Client für Bitwarden-kompatible Server als Browser-Erweiterung",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:test": "MW_TEST=1 node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "package": "node scripts/package.mjs"
+  },
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "@types/chrome": "^0.0.300",
+    "esbuild": "^0.25.12",
+    "playwright-core": "1.55",
+    "prettier": "^3.9.10",
+    "qrcode": "^1.5.4",
+    "typescript": "5.8"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^1.3.0",
+    "fflate": "^0.8.2",
+    "hash-wasm": "^4.12.0",
+    "jsqr": "^1.4.0",
+    "preact": "^10.29.8",
+    "tldts": "^7.4.18"
+  },
+  "private": true
+}

@@ -1,0 +1,10 @@
+{
+  "appName": { "message": "MultiWarden – Multicuenta para Bitwarden" },
+  "appDesc": { "message": "Cliente no oficial de Bitwarden/Vaultwarden: varias cuentas y servidores a la vez, una caja fuerte común con filtro por cuenta y autorrelleno." },
+  "cmdOpen": { "message": "Abrir la ventana" },
+  "cmdAutofillLogin": { "message": "Rellenar el inicio de sesión coincidente (repetir: siguiente coincidencia)" },
+  "cmdAutofillCard": { "message": "Rellenar tarjeta" },
+  "cmdAutofillIdentity": { "message": "Rellenar identidad" },
+  "cmdGeneratePassword": { "message": "Generar y copiar una contraseña" },
+  "cmdLock": { "message": "Bloquear todas las cajas fuertes" }
+}

@@ -1,0 +1,10 @@
+{
+  "appName": { "message": "MultiWarden – Multi-account for Bitwarden" },
+  "appDesc": { "message": "Unofficial Bitwarden/Vaultwarden client: several accounts and servers at once, one shared vault with account filter and autofill." },
+  "cmdOpen": { "message": "Open popup" },
+  "cmdAutofillLogin": { "message": "Autofill the matching login (repeat: next match)" },
+  "cmdAutofillCard": { "message": "Autofill card" },
+  "cmdAutofillIdentity": { "message": "Autofill identity" },
+  "cmdGeneratePassword": { "message": "Generate and copy a password" },
+  "cmdLock": { "message": "Lock all vaults" }
+}

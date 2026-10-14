@@ -1,0 +1,10 @@
+{
+  "appName": { "message": "MultiWarden – Multi-Account für Bitwarden" },
+  "appDesc": { "message": "Inoffizieller Bitwarden-/Vaultwarden-Client: mehrere Konten und Server gleichzeitig, gemeinsamer Tresor mit Konto-Filter und Autofill." },
+  "cmdOpen": { "message": "Popup öffnen" },
+  "cmdAutofillLogin": { "message": "Passenden Login ausfüllen (wiederholt: nächster Treffer)" },
+  "cmdAutofillCard": { "message": "Karte ausfüllen" },
+  "cmdAutofillIdentity": { "message": "Identität ausfüllen" },
+  "cmdGeneratePassword": { "message": "Passwort generieren und kopieren" },
+  "cmdLock": { "message": "Alle Tresore sperren" }
+}

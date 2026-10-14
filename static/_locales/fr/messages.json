@@ -1,0 +1,10 @@
+{
+  "appName": { "message": "MultiWarden – Multi-compte pour Bitwarden" },
+  "appDesc": { "message": "Client Bitwarden/Vaultwarden non officiel : plusieurs comptes et serveurs à la fois, un coffre commun avec filtre par compte et saisie automatique." },
+  "cmdOpen": { "message": "Ouvrir la fenêtre" },
+  "cmdAutofillLogin": { "message": "Remplir l’identifiant correspondant (répéter : correspondance suivante)" },
+  "cmdAutofillCard": { "message": "Remplir la carte" },
+  "cmdAutofillIdentity": { "message": "Remplir l’identité" },
+  "cmdGeneratePassword": { "message": "Générer et copier un mot de passe" },
+  "cmdLock": { "message": "Verrouiller tous les coffres" }
+}
