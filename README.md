@@ -1,5 +1,100 @@
-A tab of its own in the bottom bar; every tool works within one selected account:
+<p align="center">
+  <img src="static/icons/icon-128.png" width="88" alt="MultiWarden logo">
+</p>
 
+<h1 align="center">MultiWarden</h1>
+
+<p align="center">
+  <b>One vault for all your Bitwarden accounts.</b><br>
+  A browser extension for Chrome, Edge, Firefox and Opera that stays signed in to several Bitwarden and Vaultwarden servers at once.
+</p>
+
+<p align="center">
+  <b>English</b> · <a href="README.de.md">Deutsch</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/vault.png" width="300" alt="Vault with autofill suggestions from three accounts">
+  <img src="docs/screenshots/inline-menu.png" width="340" alt="Inline menu in a login field">
+  <img src="docs/screenshots/item-dark.png" width="300" alt="Item in the dark Tuvia theme">
+  <img src="docs/screenshots/tools-send.png" width="300" alt="Tools: Send in the dark Tuvia theme">
+</p>
+
+> [!NOTE]
+> MultiWarden is an unofficial project and is not affiliated with Bitwarden Inc. It only talks to the public client API and uses Bitwarden's documented encryption format.
+
+## What is it?
+
+The official Bitwarden extension shows one account at a time. If you have a personal account, a work account and maybe your own Vaultwarden server, you keep switching back and forth.
+
+MultiWarden signs in to any number of accounts on any servers at the same time (Bitwarden Cloud US/EU, self-hosted Bitwarden, Vaultwarden) and shows **one combined vault** with the items of all unlocked accounts. Autofill, the inline menu, passkeys and search work across all accounts as well. Every item carries a colored account badge, and the extra **"Account"** filter narrows the list down to a single account when you need it.
+
+On top of that you get the features of the official Bitwarden extension (as of 2026.10), including **Send**, plus tools of its own such as a **duplicate check** and a **password report**.
+
+## Features
+
+<details open>
+<summary><b>Accounts and login</b></summary>
+
+- **Multiple accounts side by side**, including several accounts on the same server.
+- **Master password** (PBKDF2 and Argon2id), new-device verification by email code on Bitwarden Cloud.
+- **Log in with device** (approval on another device, with fingerprint phrase) and **sign in with passkey** (with PRF the vault is unlocked right away).
+- **SSO** (also Vaultwarden with OpenID Connect) including **trusted devices (TDE)** and **Key Connector**.
+- **Two-step login**: authenticator app, email, YubiKey OTP, Duo (Universal Prompt) and security key/FIDO2; "Remember on this device" for all methods.
+- Create an account, request the master password hint, **custom server URLs** for individual services.
+
+</details>
+
+<details>
+<summary><b>Unlock, lock and security</b></summary>
+
+- **Shared unlock**: one password unlocks every account that uses this master password.
+- **PIN** for all accounts (optionally only until the browser restarts, disabled after five failed attempts).
+- **Biometrics** with Windows Hello, Touch ID or a security key via WebAuthn with the PRF extension (instead of the Bitwarden desktop app).
+- **Vault timeout** from "immediately" to "never", action lock or log out, lock when the system locks.
+- **Change master password**, approve login requests from other devices, manage devices, show the fingerprint phrase.
+
+</details>
+
+<details>
+<summary><b>Vault and items</b></summary>
+
+- Search across all accounts; filters for account, vault, collection, folder and type (including "Login with passkey"); favorites and autofill suggestions for the current page.
+- **Item types**: login (TOTP with countdown and QR code scan from the page), card, identity, secure note, SSH key, as well as bank account, driver's license and passport.
+- Create (with target account), edit, clone, delete, restore, archive, assign to an organization and collections; manage folders.
+- **Attachments**: upload and download (encrypted and decrypted in the browser).
+- **Quick copy** of username, password and TOTP right in the list; the same actions are always at the top of the ⋮ menu of every login.
+- Check passwords against data breaches (Have I Been Pwned, k-anonymity).
+- **Live sync**: changes from other devices arrive immediately (Vaultwarden too).
+
+</details>
+
+<details>
+<summary><b>Autofill and passkeys</b></summary>
+
+- Logins, cards and identities from all accounts via the popup, the **inline menu** in the field, the context menu or keyboard shortcuts (**Ctrl+Shift+L**, press again for the next match).
+- **Restrict filling to a domain or subdomain**: per item ("Fill on": whole domain incl. subdomains, only exactly the saved subdomain, or individually per website) and as the default for all items. This is stored as a URI match detection in Bitwarden's format, so the official apps respect it too.
+- Fill on page load, HTTP authentication dialogs (Basic/Digest), blocked domains, `data-bwignore` and `data-bwautofill`.
+- **"Save login?"** and **"Update password?"** with a choice of account and folder, also for multi-step logins.
+- Protection against filling the wrong place: foreign origins (e.g. embedded frames of other websites) are never filled, https logins on http pages and non-matching items only after confirmation; "Master password re-prompt" is respected.
+- Optional **phishing warning** using Bitwarden's phishing list (checked locally on the device).
+- Use **passkeys** from all unlocked accounts and save new ones to an account of your choice; same format as the official client. Inside an item you can show the details of each passkey (website, user, credential ID, creation date …) – the private key stays hidden.
+
+</details>
+
+<details>
+<summary><b>Generator, import, export and organizations</b></summary>
+
+- Password, passphrase (EFF word list) and username, including forwarded email aliases (addy.io, DuckDuckGo, Fastmail, Firefox Relay, Forward Email, SimpleLogin); encrypted generator history.
+- **Export** as JSON, CSV, encrypted JSON and ZIP with attachments; **import** from Bitwarden (encrypted too), KeePass 2 and CSV exports of other password managers.
+- Organization **policies** are enforced like in the official client; **event logs** and **at-risk passwords** (Access Intelligence) are supported.
+
+</details>
+
+<details>
+<summary><b>Tools</b></summary>
+
+A tab of its own in the bottom bar; every tool works within one selected account:
 - **Duplicate check**: finds duplicate logins (same website and same username, optionally also the same password), cards, identities, notes and SSH keys. For each group you can keep the most recently changed item and move the rest to the trash. Duplicates across different accounts are deliberately not detected.
 - **Send**: share text and files (up to 500 MB) end-to-end encrypted via a link – with deletion date, maximum access count, password, private notes, hidden email address and the option to disable it; edit, remove the password and delete. Compatible with Bitwarden and Vaultwarden (cross-checked with the official CLI); the "Remove Send" and "Send options" policies are respected.
 - **Receive Send**: open Send links (including ones protected by a password or email verification) right in the extension – show and copy text, download files; decryption happens on the device. If the current tab is a Send link, it is picked up automatically.
