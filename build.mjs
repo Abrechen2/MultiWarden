@@ -55,7 +55,7 @@ function firefoxManifest(m) {
   // (usernames, passwords, identities, cards – end-to-end encrypted) with the servers of the user's accounts.
   f.browser_specific_settings = {
     gecko: {
-      id: "multiwarden@local.extension",
+      id: "multiwarden@abrechen2.de",
       strict_min_version: "140.0",
       data_collection_permissions: { required: ["authenticationInfo", "personallyIdentifyingInfo", "financialAndPaymentInfo"] },
     },
