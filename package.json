@@ -1,6 +1,6 @@
 {
   "name": "multiwarden",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Multi-Account-Client für Bitwarden-kompatible Server als Browser-Erweiterung",
   "scripts": {
     "build": "node build.mjs",

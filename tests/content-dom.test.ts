@@ -378,6 +378,39 @@ const CARD = { number: "4111111111111111", cardholderName: "Alex Test", code: "1
   }
 
   // ------------------------------------------------------------------------------------------
+  // regression: the open inline menu lies over the password field below the username field;
+  // our own menu must not make that field count as "covered" (only one field got filled)
+  {
+    const LOGIN = `<form style="margin-top:20px"><input id="u" name="username" style="width:200px"><br>
+      <input id="p" type="password" name="password" style="width:200px"><br><button>Login</button></form>`;
+    const p = await open(ctx, "login-menu", LOGIN);
+    const n0 = await p.evaluate(() => (window as any).MWH.fill({ kind: "login", username: "alex", password: "pw" }).filled);
+    check("login fill without menu fills username and password", n0 === 2 && (await p.inputValue("#p")) === "pw", n0);
+    await p.close();
+    const q = await open(ctx, "login-menu2", LOGIN);
+    await q.click("#u");
+    await q.waitForTimeout(600);
+    const n = await q.evaluate(() => {
+      const opid = (window as any).__mw.opids.at(-1);
+      return (globalThis as any).__mwFill({ kind: "login", username: "alex", password: "pw", targetOpid: opid }).filled as number;
+    });
+    check(
+      "login fill from the open inline menu fills username and password",
+      (await q.inputValue("#u")) === "alex" && (await q.inputValue("#p")) === "pw",
+      { n, u: await q.inputValue("#u"), p: await q.inputValue("#p") },
+    );
+    await q.close();
+    // a page element that only borrows the tag name is still a cover
+    const f = await open(
+      ctx,
+      "fake-host",
+      `<input id="v" style="width:200px;margin-top:40px"><mw-inline-menu style="position:absolute;left:0;top:30px;width:400px;height:60px;display:block;background:#fff"></mw-inline-menu>`,
+    );
+    check("page-made <mw-inline-menu> still covers a field", (await f.evaluate(() => (window as any).MWH.isVisible(document.getElementById("v")))) === false);
+    await f.close();
+  }
+
+  // ------------------------------------------------------------------------------------------
   // 3: origin guard between the background's match and the fill
   {
     const p = await open(ctx, "origin", `<form><input id="u" name="username"><input id="p" type="password"></form>`);

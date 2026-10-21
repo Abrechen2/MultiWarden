@@ -12,6 +12,7 @@ import {
   isUsernameField,
   isVisible,
   menuKindOf,
+  registerOwnHost,
 } from "./fields";
 import { collect, fill, FillGuard, findPairs, opidOf } from "./fill";
 import { filterFactor, Intent, intentAllows, MIN_MENU_OPACITY } from "./guard";
@@ -183,6 +184,7 @@ async function openMenu(field: HTMLInputElement, kind: MenuKind) {
   menuHeight = 0;
   menuBox = { left: 0, top: 0, width: 0, height: 0 };
   const host = document.createElement("mw-inline-menu");
+  registerOwnHost(host);
   setStyles(host, { ...HOST_BASE, "z-index": "2147483647", height: "0" });
   const shadow = host.attachShadow({ mode: "closed" });
   const frame = document.createElement("iframe");
@@ -249,6 +251,7 @@ function showIcon(field: HTMLInputElement, kind: MenuKind) {
   if (iconField === field && iconHost) return;
   hideIcon();
   const host = document.createElement("mw-inline-button");
+  registerOwnHost(host);
   setStyles(host, { ...HOST_BASE, "z-index": "2147483646" });
   const shadow = host.attachShadow({ mode: "closed" });
   const btn = document.createElement("button");
@@ -397,6 +400,7 @@ function showBar(token: string) {
   closeBar();
   barToken = token;
   const host = document.createElement("mw-notification");
+  registerOwnHost(host);
   barHeight = 0;
   barRestores = 0;
   setStyles(host, BAR_STYLE);

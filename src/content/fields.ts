@@ -137,13 +137,25 @@ export function isVisible(el: HTMLElement): boolean {
   return !isCovered(el, r);
 }
 
+/**
+ * The extension's own overlays (inline menu, field icon, notification bar). The open inline menu lies over
+ * the field below the focused one; it must not make that field count as covered. Only the instances the
+ * content script created count – a page element that merely carries the same tag name is a cover like any other.
+ */
+const ownHosts = new WeakSet<Element>();
+export function registerOwnHost(host: Element) {
+  ownHosts.add(host);
+}
+
 /** Another element is painted over the centre of the (on-screen) field. */
 function isCovered(el: HTMLElement, r: DOMRect): boolean {
   const x = r.left + r.width / 2;
   const y = r.top + r.height / 2;
   if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return false; // below the fold: scrollable
   const root = el.getRootNode() as Document | ShadowRoot;
-  const hit = (root.elementFromPoint ? root.elementFromPoint(x, y) : document.elementFromPoint(x, y)) as Element | null;
+  const stack = (root.elementsFromPoint ? root.elementsFromPoint(x, y) : document.elementsFromPoint(x, y)) as Element[];
+  // look through our own overlays at what the page itself paints there
+  const hit = stack.find((e) => !ownHosts.has(e)) ?? null;
   if (!hit || hit === el || el.contains(hit)) return false;
   // its own label drawn on top (floating labels)
   const labels = (el as HTMLInputElement).labels;
