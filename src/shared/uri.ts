@@ -22,17 +22,35 @@ export function parseUrl(uri: string): URL | null {
   }
 }
 
-/** Base ("registrable") domain, or hostname for IPs / single-label hosts. */
+/**
+ * Base ("registrable") domain, or hostname for IPs / single-label hosts. Private suffixes
+ * (github.io, herokuapp.com, pages.dev, …) count as public: a.github.io and b.github.io belong
+ * to different owners and must not share a base domain.
+ */
 export function baseDomain(uri: string): string | null {
   const u = parseUrl(uri);
-  if (!u || !/^https?:$/.test(u.protocol)) {
-    // still allow e.g. ftp://host
-    if (!u) return null;
-  }
+  // still allows e.g. ftp://host; uriMatches() keeps app schemes away from web pages
+  if (!u) return null;
   const host = u.hostname.toLowerCase();
   if (!host) return null;
   if (IP_RE.test(host) || host === "localhost" || !host.includes(".")) return host;
-  return getDomain(host, { allowPrivateDomains: false }) ?? host;
+  return getDomain(host, { allowPrivateDomains: true }) ?? host;
+}
+
+const WEB_PROTOCOL = /^https?:$/;
+
+/**
+ * Web URIs (http/https, or no scheme) only match web pages; any other scheme (androidapp://,
+ * iosapp://, ftp://, …) only matches the same scheme. Otherwise androidapp://com.foo.app would
+ * match the website of whoever owns foo.app.
+ */
+export function sameSchemeKind(cipherUri: string, url: string): boolean {
+  const cu = parseUrl(cipherUri);
+  const tu = parseUrl(url);
+  if (!cu || !tu) return false;
+  const cw = WEB_PROTOCOL.test(cu.protocol);
+  const tw = WEB_PROTOCOL.test(tu.protocol);
+  return cw && tw ? true : !cw && !tw && cu.protocol === tu.protocol;
 }
 
 export function hostOf(uri: string): string | null {
@@ -78,22 +96,16 @@ export function uriMatches(cipherUri: string, match: UriMatch | null | undefined
     case UriMatch.Domain: {
       if (!ctx.domain) return false;
       const d = baseDomain(cipherUri);
-      if (!d) return false;
-      if (ctx.equivalentDomains.has(d)) {
-        // Bitwarden: domain match requires the URL to be http(s) when the cipher uri is
-        const cu = parseUrl(cipherUri);
-        const tu = parseUrl(ctx.url);
-        if (!cu || !tu) return false;
-        return true;
-      }
-      return false;
+      return !!d && ctx.equivalentDomains.has(d) && sameSchemeKind(cipherUri, ctx.url);
     }
     case UriMatch.Host: {
       const h = hostOf(cipherUri);
-      return !!h && h === ctx.host;
+      return !!h && h === ctx.host && sameSchemeKind(cipherUri, ctx.url);
     }
     case UriMatch.StartsWith:
-      return ctx.url.startsWith(normalizeUri(cipherUri)) || ctx.url.startsWith(cipherUri);
+      return (
+        sameSchemeKind(cipherUri, ctx.url) && (ctx.url.startsWith(normalizeUri(cipherUri)) || ctx.url.startsWith(cipherUri))
+      );
     case UriMatch.Exact:
       return ctx.url === cipherUri || ctx.url === normalizeUri(cipherUri);
     case UriMatch.RegularExpression:

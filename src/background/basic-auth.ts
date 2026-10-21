@@ -2,7 +2,8 @@
 // login (rules as in the official extension: only top-level navigations the user opened, only
 // basic/digest, never proxies, challenger must be the request host, exactly one match).
 import { EventType } from "../shared/events";
-import { CipherType, UriMatch } from "../shared/types";
+import { CipherType, ItemView, UriMatch } from "../shared/types";
+import { insecureFor } from "./autofill";
 import { VaultService } from "./vault-service";
 
 const FILTER: chrome.webRequest.RequestFilter = { urls: ["http://*/*", "https://*/*"] };
@@ -35,6 +36,15 @@ export function shouldAnswer(d: Details): boolean {
     if (cp !== rp) return false;
   }
   return true;
+}
+
+/**
+ * The one login to answer a challenge for `url` with, or undefined. Logins saved only for https
+ * never answer a plain http challenge: anyone on the network could send that 401.
+ */
+export function pickBasicAuthItem(matches: ItemView[], url: string): ItemView | undefined {
+  const usable = matches.filter((i) => i.type === CipherType.Login && !insecureFor(i, url));
+  return usable.length === 1 ? usable[0] : undefined;
 }
 
 export class BasicAuth {
@@ -84,10 +94,8 @@ export class BasicAuth {
     await this.svc.ready;
     if (this.svc.settings.basicAuth === false || !this.svc.anyUnlocked()) return {};
     // items with the default match are compared by host (incl. port), as in the official extension
-    const matches = (await this.svc.matchesForUrl(d.url, UriMatch.Host)).filter((i) => i.type === CipherType.Login);
-    if (matches.length !== 1) return {};
-    const m = matches[0];
-    if (m.reprompt === 1 || m.login?.username == null || m.login?.password == null) return {};
+    const m = pickBasicAuthItem(await this.svc.matchesForUrl(d.url, UriMatch.Host), d.url);
+    if (!m || m.reprompt === 1 || m.login?.username == null || m.login?.password == null) return {};
     await this.svc.markUsed(m.accountKey, m.id);
     this.svc.events.collect(m.accountKey, EventType.CipherClientAutofilled, m);
     return { authCredentials: { username: m.login.username, password: m.login.password } };

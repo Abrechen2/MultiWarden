@@ -39,12 +39,16 @@ export async function collectFrames(tabId: number): Promise<FrameResult[]> {
   return frames.filter((f) => f.result);
 }
 
-async function fillFrame(tabId: number, frameId: number, data: FillData): Promise<number> {
+/**
+ * Fill one frame. `expectOrigin` is the origin the frame had when it was checked; the content side
+ * refuses to fill if the frame has navigated elsewhere in the meantime.
+ */
+async function fillFrame(tabId: number, frameId: number, data: FillData, expectOrigin: string): Promise<number> {
   try {
     const [r] = await chrome.scripting.executeScript({
       target: { tabId, frameIds: [frameId] },
       func: (d: any) => (globalThis as any).__mwFill?.(d) ?? { filled: 0 },
-      args: [data],
+      args: [{ ...data, expectOrigin }],
     });
     return (r?.result as any)?.filled ?? 0;
   } catch {
@@ -137,7 +141,7 @@ export async function fillItem(svc: VaultService, tabId: number, item: ItemView,
     onlyEmpty: !!opts.pageLoad,
   };
   let filled = 0;
-  for (const tx of targets) filled += await fillFrame(tabId, tx.frameId, data);
+  for (const tx of targets) filled += await fillFrame(tabId, tx.frameId, data, tx.result!.origin);
   if (!filled) return { ok: false, error: t("Es konnten keine Felder ausgefüllt werden") };
   await svc.markUsed(item.accountKey, item.id);
   svc.events.collect(item.accountKey, EventType.CipherClientAutofilled, item);
@@ -148,6 +152,34 @@ function customFields(item: ItemView) {
   return item.fields.filter((f) => f.type !== FieldType.Linked && f.name).map((f) => ({ name: f.name, value: f.value }));
 }
 
+interface FrameFields {
+  frameId: number;
+  result: Pick<CollectResult, "origin" | "cardFields" | "hasCardNumber" | "identityFields"> | null;
+}
+
+/**
+ * Frames a card / identity goes into. Explicit frame (inline menu, context menu): only that one.
+ * Otherwise the page and its same-origin frames; a cross-origin frame (hosted payment form) gets a
+ * card only after the user confirmed (`force`) and only if it holds a card number / CVC field.
+ * Identities never go into cross-origin frames.
+ */
+export function cardIdentityTargets(
+  frames: FrameFields[],
+  o: { isCard: boolean; frameId?: number; force?: boolean },
+): { targets: { frameId: number; origin: string; crossOrigin: boolean }[]; blockedCrossOrigin: boolean } {
+  const topOrigin = frames.find((f) => f.frameId === 0)?.result?.origin;
+  const withFields = frames.filter((f) => !!f.result && (o.isCard ? f.result.cardFields > 0 : f.result.identityFields > 0));
+  const mk = (f: FrameFields, crossOrigin: boolean) => ({ frameId: f.frameId, origin: f.result!.origin, crossOrigin });
+  if (o.frameId != null)
+    return { targets: withFields.filter((f) => f.frameId === o.frameId).map((f) => mk(f, false)), blockedCrossOrigin: false };
+  const same = withFields.filter((f) => !!topOrigin && f.result!.origin === topOrigin);
+  const cross = o.isCard ? withFields.filter((f) => f.result!.origin !== topOrigin && f.result!.hasCardNumber) : [];
+  return {
+    targets: [...same.map((f) => mk(f, false)), ...(o.force ? cross.map((f) => mk(f, true)) : [])],
+    blockedCrossOrigin: !o.force && cross.length > 0,
+  };
+}
+
 async function fillCardOrIdentity(svc: VaultService, tabId: number, item: ItemView, opts: FillOptions): Promise<FillOutcome> {
   const isCard = item.type === CipherType.Card;
   let frames: FrameResult[];
@@ -156,12 +188,10 @@ async function fillCardOrIdentity(svc: VaultService, tabId: number, item: ItemVi
   } catch {
     return { ok: false, error: t("Auf dieser Seite kann nicht ausgefüllt werden") };
   }
-  const top = frames.find((f) => f.frameId === 0);
-  const topOrigin = top?.result?.origin;
-  let targets = frames.filter((f) => (isCard ? f.result!.cardFields > 0 : f.result!.identityFields > 0));
-  if (opts.frameId != null) targets = targets.filter((f) => f.frameId === opts.frameId);
-  // identities: page + same-origin frames; cards also in hosted payment frames (card number / CVC)
-  else targets = targets.filter((f) => f.result!.origin === topOrigin || (isCard && f.result!.hasCardNumber));
+  const { targets, blockedCrossOrigin } = cardIdentityTargets(frames, { isCard, frameId: opts.frameId, force: opts.force });
+  // card fields only in a frame of another site (e.g. hosted payment form) → the popup asks first
+  if (!targets.length && blockedCrossOrigin)
+    return { ok: false, code: FILL_MISMATCH, error: t("Die Kartenfelder liegen in einem eingebetteten Rahmen einer anderen Website") };
   if (!targets.length)
     return {
       ok: false,
@@ -175,10 +205,7 @@ async function fillCardOrIdentity(svc: VaultService, tabId: number, item: ItemVi
     targetOpid: opts.targetOpid,
   };
   let filled = 0;
-  for (const tx of targets) {
-    const crossOrigin = tx.result!.origin !== topOrigin && opts.frameId == null;
-    filled += await fillFrame(tabId, tx.frameId, { ...base, requireCardNumber: crossOrigin });
-  }
+  for (const tx of targets) filled += await fillFrame(tabId, tx.frameId, { ...base, requireCardNumber: tx.crossOrigin }, tx.origin);
   if (!filled) return { ok: false, error: t("Es konnten keine Felder ausgefüllt werden") };
   await svc.markUsed(item.accountKey, item.id);
   svc.events.collect(item.accountKey, EventType.CipherClientAutofilled, item);
@@ -186,8 +213,8 @@ async function fillCardOrIdentity(svc: VaultService, tabId: number, item: ItemVi
 }
 
 /** Generated password into the new-password fields of a frame (or the focused field). */
-export async function fillGenerated(tabId: number, frameId: number, password: string, targetOpid?: string): Promise<boolean> {
-  return (await fillFrame(tabId, frameId, { kind: "generated", password, targetOpid })) > 0;
+export async function fillGenerated(tabId: number, frameId: number, password: string, targetOpid: string | undefined, expectOrigin: string): Promise<boolean> {
+  return (await fillFrame(tabId, frameId, { kind: "generated", password, targetOpid }, expectOrigin)) > 0;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -330,9 +357,18 @@ export async function inlineMenuGenerate(token: string): Promise<string> {
 export async function inlineMenuFillGenerated(token: string): Promise<{ ok: boolean; password?: string }> {
   const tk = tokens.get(token);
   if (!tk || tk.kind !== "newPassword" || !tk.generated) return { ok: false };
-  const ok = await fillGenerated(tk.tabId, tk.frameId, tk.generated, tk.opid);
+  const ok = await fillGenerated(tk.tabId, tk.frameId, tk.generated, tk.opid, originOf(tk.url));
   closeInlineMenu(tk);
   return { ok, password: ok ? tk.generated : undefined };
+}
+
+/** Origin of an http(s) URL as `location.origin` reports it ("null" if unparsable, which never matches). */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "null";
+  }
 }
 
 function closeInlineMenu(tk: MenuToken) {

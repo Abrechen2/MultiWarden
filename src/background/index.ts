@@ -385,7 +385,7 @@ const handlers: Record<string, Handler> = {
   },
   async authRequestRespond(args) {
     await svc.touch();
-    await svc.respondAuthRequest(args.accountKey, args.id, !!args.approve);
+    await svc.respondAuthRequest(args.accountKey, args.id, !!args.approve, typeof args.publicKey === "string" ? args.publicKey : undefined);
     seenAuthRequests.add(args.id);
     return { ok: true };
   },

@@ -9,7 +9,7 @@ import { formatDate, relTime } from "../util";
 
 import { t } from "../../shared/i18n";
 
-type Req = { accountKey: string; id: string; device: string; ip: string; created: number; fingerprint: string };
+type Req = { accountKey: string; id: string; device: string; ip: string; created: number; fingerprint: string; publicKey: string };
 
 /** Pending "login with device" requests of all unlocked accounts. */
 export function AuthRequestsView() {
@@ -29,7 +29,8 @@ export function AuthRequestsView() {
   const respond = async (r: Req, approve: boolean) => {
     setBusy(r.id);
     try {
-      await call("authRequestRespond", { accountKey: r.accountKey, id: r.id, approve });
+      // the key the shown fingerprint belongs to: the background refuses to encrypt to any other
+      await call("authRequestRespond", { accountKey: r.accountKey, id: r.id, approve, publicKey: r.publicKey });
       toast.show(approve ? t("Anmeldung bestätigt") : t("Anmeldung abgelehnt"));
       await load();
     } catch (e: any) {

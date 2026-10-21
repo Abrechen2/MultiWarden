@@ -19,7 +19,7 @@ import {
   stretchKey,
   SymKey,
 } from "../crypto/bw";
-import { b64decode, b64encode, randomBytes } from "../crypto/utils";
+import { b64decode, b64encode, equalBytes, randomBytes } from "../crypto/utils";
 import type { SerializedKey } from "../crypto/bw";
 import { newGuid } from "../crypto/utils";
 import type { PageMatch, UnlockResult } from "../shared/messages";
@@ -64,6 +64,8 @@ export interface AuthRequestView {
   ip: string;
   created: number;
   fingerprint: string;
+  /** requesting device's public key (base64 SPKI) the fingerprint was made from */
+  publicKey: string;
 }
 import {
   AccountKeys,
@@ -143,6 +145,15 @@ export interface CompleteLoginParams {
   encUserKey?: string;
   ssoOrgIdentifier?: string;
   keyConnectorUrl?: string;
+}
+
+/** Two base64 keys hold the same bytes (false if either is not valid base64). */
+function sameKey(a: string, b: string): boolean {
+  try {
+    return equalBytes(b64decode(a), b64decode(b));
+  } catch {
+    return false;
+  }
 }
 
 function serverLabel(acc: AccountRecord): string {
@@ -1514,13 +1525,18 @@ export class VaultService {
         ip: String(a.requestIpAddress ?? ""),
         created: created || Date.now(),
         fingerprint: await fingerprintPhrase(acc.email.toLowerCase(), b64decode(a.publicKey)),
+        publicKey: a.publicKey,
       });
     }
     return out;
   }
 
-  /** Approve (send the user key encrypted to the requesting device) or deny a login request. */
-  async respondAuthRequest(accountKey: string, id: string, approve: boolean) {
+  /**
+   * Approve (send the user key encrypted to the requesting device) or deny a login request.
+   * `shownPublicKey` is the key whose fingerprint the user compared; approval is refused if the
+   * server now hands out a different one.
+   */
+  async respondAuthRequest(accountKey: string, id: string, approve: boolean, shownPublicKey?: string) {
     const acc = this.account(accountKey);
     const st = this.unlocked.get(accountKey);
     if (!st) throw new Error(t("Konto ist gesperrt"));
@@ -1528,6 +1544,8 @@ export class VaultService {
     let key = "";
     if (approve) {
       if (!r?.publicKey) throw new Error(t("Die Anfrage ist nicht mehr gültig"));
+      if (!shownPublicKey || !sameKey(r.publicKey, shownPublicKey))
+        throw new Error(t("Der Schlüssel der Anfrage hat sich geändert. Bitte den Fingerabdruck erneut prüfen."));
       key = await rsaEncryptKey(st.userKey, b64decode(r.publicKey));
     }
     await this.api(acc).send("PUT", "/auth-requests/" + id, {
