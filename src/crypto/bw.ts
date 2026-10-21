@@ -199,7 +199,8 @@ export async function decryptBytes(encStr: string, key: SymKey): Promise<Decrypt
     return { bytes: pt };
   }
   if (p.type === EncType.AesCbc256_B64) {
-    if (key.t === "cose") throw new DecryptError("Key type mismatch");
+    // Unauthenticated CBC only for the legacy unstretched key; a MAC key must never accept it (MAC-strip downgrade)
+    if (key.t !== "cbc") throw new DecryptError("Key type mismatch (unauthenticated EncString)");
     const ak = await aesKey(key);
     const pt = new Uint8Array(await subtle.decrypt({ name: "AES-CBC", iv: buf(p.iv!) }, ak, buf(p.data)));
     return { bytes: pt };
@@ -454,6 +455,11 @@ export async function deriveMasterKey(password: string, salt: string, cfg: KdfCo
   return deriveKeyFromPassword(password, salt.trim().toLowerCase(), cfg);
 }
 
+const ARGON2_MIN_ITERATIONS = 2;
+const ARGON2_MIN_MEMORY_MIB = 16;
+const ARGON2_MAX_MEMORY_MIB = 1024;
+const ARGON2_MAX_PARALLELISM = 16;
+
 /** KDF with the salt exactly as given (e.g. the random salt of password-protected exports). */
 export async function deriveKeyFromPassword(password: string, salt: string, cfg: KdfConfig): Promise<Uint8Array> {
   const pw = utf8(password);
@@ -463,6 +469,12 @@ export async function deriveKeyFromPassword(password: string, salt: string, cfg:
     return pbkdf2(pw, s, cfg.iterations);
   }
   if (cfg.kdf === KdfType.Argon2id) {
+    // Bitwarden's bounds; the parameters come from the server (or an import file) and must not be weakened
+    const t = cfg.iterations;
+    const m = cfg.memory ?? 64;
+    const p = cfg.parallelism ?? 4;
+    if (!(t >= ARGON2_MIN_ITERATIONS && m >= ARGON2_MIN_MEMORY_MIB && m <= ARGON2_MAX_MEMORY_MIB && p >= 1 && p <= ARGON2_MAX_PARALLELISM))
+      throw new Error("Argon2id-Parameter außerhalb des zulässigen Bereichs");
     const saltHash = await sha256(s);
     const out = await argon2id({
       password: pw,
@@ -540,7 +552,7 @@ export async function decryptFileData(buffer: Uint8Array, key: SymKey): Promise<
     return new Uint8Array(await subtle.decrypt({ name: "AES-CBC", iv: buf(iv) }, ak, buf(data)));
   }
   if (type === EncType.AesCbc256_B64) {
-    if (key.t === "cose") throw new DecryptError("Key type mismatch");
+    if (key.t !== "cbc") throw new DecryptError("Key type mismatch (unauthenticated file data)");
     const iv = buffer.subarray(1, 17);
     const ak = await aesKey(key);
     return new Uint8Array(await subtle.decrypt({ name: "AES-CBC", iv: buf(iv) }, ak, buf(buffer.subarray(17))));

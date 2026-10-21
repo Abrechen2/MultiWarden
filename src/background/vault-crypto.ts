@@ -96,7 +96,8 @@ export async function deriveAccountKeys(sync: any, userKey: SymKey): Promise<Acc
 
 async function dec(s: string | null | undefined, key: SymKey): Promise<string | undefined> {
   if (s == null || s === "") return undefined;
-  if (!isEncString(s)) return s;
+  // every vault field is encrypted; plaintext here can only come from a tampering server
+  if (!isEncString(s)) return DEC_FAIL;
   try {
     return await decryptString(s, key);
   } catch {
