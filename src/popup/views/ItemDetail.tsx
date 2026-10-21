@@ -737,10 +737,11 @@ function ItemDetailInner({ item, itemKeyStr }: { item: ItemView; itemKeyStr: str
   );
 }
 
-/** Clone, archive, move to an organization / collections. */
+/** Clone, copy into another account, archive, move to an organization / collections. */
 function ItemMoreMenu({ item }: { item: ItemView }) {
   const app = useApp();
   const toast = useToast();
+  const actions = useItemActions(item);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const key = itemKey(item);
@@ -785,6 +786,17 @@ function ItemMoreMenu({ item }: { item: ItemView }) {
           <MenuItem icon="copy" onClick={clone}>
             <span data-testid="menu-clone">{t("Klonen")}</span>
           </MenuItem>
+          {actions.canCopyToAccount && (
+            <MenuItem
+              icon="copy"
+              onClick={() => {
+                setOpen(false);
+                actions.copyToAccount();
+              }}
+            >
+              <span data-testid="menu-copy-account">{t("In anderes Konto kopieren")}</span>
+            </MenuItem>
+          )}
           {item.edit && !item.deletedDate && (
             <MenuItem icon="archive" onClick={() => archive(!item.archivedDate)}>
               <span data-testid="menu-archive">{item.archivedDate ? t("Aus dem Archiv holen") : t("Archivieren")}</span>

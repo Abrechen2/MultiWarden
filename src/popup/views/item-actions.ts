@@ -144,5 +144,29 @@ export function useItemActions(item: ItemView) {
 
   const canFill = item.type === CipherType.Login || item.type === CipherType.Card || item.type === CipherType.Identity;
 
-  return { logEvent, copy, copyOptions, fill, canFill, launch, toggleFavorite, guard };
+  /** "copy into another account": needs another unlocked account; not for items in the trash */
+  const canCopyToAccount = !item.deletedDate && app.accounts.some((a) => a.status === "unlocked" && a.key !== item.accountKey);
+  const copyToAccount = async () => {
+    // the organization hides the password: a copy in another account would reveal it
+    if (!item.viewPassword) {
+      toast.show(t("Das Passwort dieses Eintrags ist für dich verborgen – er kann nicht kopiert werden."), "error");
+      return;
+    }
+    if (!(await guard())) return;
+    const r = await dialogs.copyToAccount(item);
+    if (!r) return;
+    await app.reloadVault();
+    const target = app.accountMap.get(r.targetAccountKey)?.label ?? "";
+    if (r.attachmentsFailed.length)
+      toast.show(
+        t("In {account} kopiert, aber diese Anhänge konnten nicht kopiert werden: {names}", {
+          account: target,
+          names: r.attachmentsFailed.join(", "),
+        }),
+        "error",
+      );
+    else toast.show(t("In {account} kopiert", { account: target }));
+  };
+
+  return { logEvent, copy, copyOptions, fill, canFill, launch, toggleFavorite, guard, canCopyToAccount, copyToAccount };
 }

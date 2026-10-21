@@ -598,6 +598,20 @@ const handlers: Record<string, Handler> = {
     }
   },
   setItemCollections: (args) => result(() => svc.setItemCollections(args.accountKey, args.itemId, args.collectionIds ?? [])),
+  async copyItemToAccount(args) {
+    try {
+      await svc.touch();
+      const r = await svc.copyItemToAccount(
+        String(args.accountKey),
+        String(args.itemId),
+        String(args.targetAccountKey),
+        args.folderId ? String(args.folderId) : null,
+      );
+      return { ok: true, ...r };
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) };
+    }
+  },
   async attachmentDownload(args) {
     await svc.touch();
     return svc.attachmentDownload(args.accountKey, args.itemId, args.attachmentId);

@@ -204,6 +204,11 @@ export function isRestricted(p: AccountPolicies | undefined, type: number, organ
   return organizationId ? !r.allowOrgIds.includes(organizationId) : true;
 }
 
+/** May the account create an item of this type in its personal vault (data ownership, restricted types)? */
+export function personalItemAllowed(p: AccountPolicies | undefined, type: number): boolean {
+  return !p?.dataOwnership && !isRestricted(p, type, null);
+}
+
 /** The vault timeout allowed by a maximum session timeout policy (official rules, mapped to MultiWarden). */
 export function clampTimeout(current: VaultTimeout, p: TimeoutPolicy | undefined): VaultTimeout {
   if (!p) return current;

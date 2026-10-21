@@ -13,6 +13,7 @@ import {
   rsaEncryptKey,
   publicKeyFromPrivate,
   encryptString,
+  decryptFileData,
   generateCbcHmacKey,
   KdfConfig,
   serializeKey,
@@ -41,7 +42,7 @@ import {
 import { makeMatchContext, uriMatches } from "../shared/uri";
 import { AccountApi, bearerJson, camelize, CLIENT_NAME, decodeJwt, HttpError, sendBody } from "./api";
 import { local, session } from "./store";
-import { buildExport, decryptExport, ExportContext, ExportFormat } from "./transfer";
+import { buildExport, decryptExport, ExportContext, ExportFormat, plainPasskeys } from "./transfer";
 import { mergePolicies, MpPolicy } from "../shared/mp-policy";
 import { EventCollector } from "./events";
 import {
@@ -50,6 +51,7 @@ import {
   clampTimeout,
   isRestricted,
   mergeGeneratorPolicies,
+  personalItemAllowed,
   mergeTimeoutPolicies,
   PolicyType,
 } from "../shared/policies";
@@ -1370,7 +1372,7 @@ export class VaultService {
     accountKey: string,
     item: ItemView,
     isNew: boolean,
-    opts: { newPasskey?: PasskeyPlain } = {},
+    opts: { newPasskey?: PasskeyPlain; importPasskeys?: Record<string, string>[] } = {},
   ): Promise<ItemView | undefined> {
     const acc = this.account(accountKey);
     const keys = await this.ensureKeys(accountKey);
@@ -1694,9 +1696,8 @@ export class VaultService {
 
   /** Start an upload; the file arrives in base64 chunks (extension messaging carries JSON only). */
   async attachmentUploadStart(accountKey: string, itemId: string, fileName: string, size: number): Promise<string> {
-    const MAX = 500 * 1024 * 1024;
     if (!(size > 0)) throw new Error(t("Die Datei ist leer"));
-    if (size > MAX) throw new Error(t("Die Datei ist zu groß (höchstens 500 MB)"));
+    if (size > MAX_ATTACHMENT) throw new Error(t("Die Datei ist zu groß (höchstens 500 MB)"));
     const item = await this.findItem(accountKey, itemId);
     if (!item) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
     if (!item.edit) throw new Error(t("Keine Berechtigung, diesen Eintrag zu ändern"));
@@ -1730,18 +1731,23 @@ export class VaultService {
       plain.set(c, off);
       off += c.length;
     }
-    const acc = this.account(u.accountKey);
-    const keys = await this.ensureKeys(u.accountKey);
-    const data = await this.rawSync(u.accountKey);
-    const raw = (data.ciphers ?? []).find((c: any) => c.id === u.itemId);
+    return this.putAttachment(u.accountKey, u.itemId, u.fileName, plain);
+  }
+
+  /** Encrypt a file with a new file key and attach it to an item (rolled back if the upload fails). */
+  private async putAttachment(accountKey: string, itemId: string, fileName: string, plain: Uint8Array): Promise<ItemView | undefined> {
+    const acc = this.account(accountKey);
+    const keys = await this.ensureKeys(accountKey);
+    const data = await this.rawSync(accountKey);
+    const raw = (data.ciphers ?? []).find((c: any) => c.id === itemId);
     if (!raw) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
     const cipherKey = await cipherKeyFor(raw, keys);
     const fileKey = generateCbcHmacKey();
     const encData = await encryptFileData(plain, fileKey);
-    const encFileName = await encryptString(u.fileName, cipherKey);
+    const encFileName = await encryptString(fileName, cipherKey);
     const api = this.api(acc);
     const up = camelize(
-      await api.send("POST", `/ciphers/${u.itemId}/attachment/v2`, {
+      await api.send("POST", `/ciphers/${itemId}/attachment/v2`, {
         key: await encryptKey(fileKey, cipherKey),
         fileName: encFileName,
         fileSize: encData.length,
@@ -1754,14 +1760,14 @@ export class VaultService {
       else {
         const fd = new FormData();
         fd.append("data", new Blob([encData.slice().buffer as ArrayBuffer], { type: "application/octet-stream" }), encFileName);
-        await sendBody(api, `${acc.urls.api}/ciphers/${u.itemId}/attachment/${up.attachmentId}`, "POST", fd);
+        await sendBody(api, `${acc.urls.api}/ciphers/${itemId}/attachment/${up.attachmentId}`, "POST", fd);
       }
     } catch (e) {
       // roll back the announced attachment
-      await api.send("DELETE", `/ciphers/${u.itemId}/attachment/${up.attachmentId}`).catch(() => {});
+      await api.send("DELETE", `/ciphers/${itemId}/attachment/${up.attachmentId}`).catch(() => {});
       throw e;
     }
-    return this.refreshCipher(u.accountKey, u.itemId);
+    return this.refreshCipher(accountKey, itemId);
   }
 
   async attachmentDelete(accountKey: string, itemId: string, attachmentId: string): Promise<ItemView | undefined> {
@@ -1779,6 +1785,16 @@ export class VaultService {
     itemId: string,
     attachmentId: string,
   ): Promise<{ url: string; key: SerializedKey; fileName: string; size?: number }> {
+    const src = await this.attachmentSource(accountKey, itemId, attachmentId);
+    return { url: src.url, key: serializeKey(src.fileKey), fileName: src.fileName, size: src.size };
+  }
+
+  /** Download URL, file key and name of an attachment (the key stays in the background). */
+  private async attachmentSource(
+    accountKey: string,
+    itemId: string,
+    attachmentId: string,
+  ): Promise<{ url: string; fileKey: SymKey; fileName: string; size?: number }> {
     const acc = this.account(accountKey);
     const keys = await this.ensureKeys(accountKey);
     const data = await this.rawSync(accountKey);
@@ -1808,7 +1824,82 @@ export class VaultService {
       /* keep default */
     }
     const size = Number(meta.size);
-    return { url, key: serializeKey(fileKey), fileName, size: Number.isFinite(size) ? size : undefined };
+    return { url, fileKey, fileName, size: Number.isFinite(size) ? size : undefined };
+  }
+
+  /** Fetch and decrypt an attachment inside the background. */
+  private async attachmentPlain(accountKey: string, itemId: string, attachmentId: string): Promise<Uint8Array> {
+    const src = await this.attachmentSource(accountKey, itemId, attachmentId);
+    if (src.size != null && src.size > MAX_ATTACHMENT) throw new Error(t("Die Datei ist zu groß (höchstens 500 MB)"));
+    const res = await fetch(src.url, { credentials: "omit", cache: "no-store" });
+    if (!res.ok) throw new Error(t("Download fehlgeschlagen (HTTP {status})", { status: res.status }));
+    try {
+      return await decryptFileData(new Uint8Array(await res.arrayBuffer()), src.fileKey);
+    } catch {
+      throw new Error(t("Der Anhang konnte nicht entschlüsselt werden"));
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // copy into another account
+
+  /**
+   * Copy an item into the personal vault of another unlocked account: all data, passkeys and
+   * attachments are re-encrypted with the target account's keys. The original stays untouched.
+   * A failed attachment does not undo the copy; its name is reported in `attachmentsFailed`.
+   */
+  async copyItemToAccount(
+    sourceKey: string,
+    itemId: string,
+    targetKey: string,
+    targetFolderId: string | null,
+  ): Promise<{ id: string; attachmentsFailed: string[] }> {
+    if (sourceKey === targetKey) throw new Error(t("Bitte ein anderes Konto wählen"));
+    const target = this.account(targetKey);
+    if (!this.isUnlocked(sourceKey) || !this.isUnlocked(targetKey)) throw new Error(t("Konto ist gesperrt"));
+    const item = await this.findItem(sourceKey, itemId);
+    const raw = ((await this.rawSync(sourceKey)).ciphers ?? []).find((c: any) => c.id === itemId);
+    if (!item || !raw) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
+    if (item.deletedDate) throw new Error(t("Einträge im Papierkorb können nicht kopiert werden"));
+    // the organization hides the password from this user: a copy would reveal it
+    if (!item.viewPassword) throw new Error(t("Das Passwort dieses Eintrags ist für dich verborgen – er kann nicht kopiert werden."));
+    if (item.decryptError || hasDecryptFailure(item))
+      throw new Error(t("Der Eintrag konnte nicht vollständig entschlüsselt werden und wird deshalb nicht kopiert."));
+    if (!personalItemAllowed(target.policies, item.type))
+      throw new Error(t("Eine Richtlinie verbietet Einträge im persönlichen Tresor dieses Kontos."));
+    if (targetFolderId && !(await this.ensureVault(targetKey))?.folders.some((f) => f.id === targetFolderId))
+      throw new Error(t("Ordner nicht gefunden – bitte synchronisieren"));
+
+    const passkeys = item.type === CipherType.Login ? await plainPasskeys(raw, await this.ensureKeys(sourceKey), true) : undefined;
+    const copy: ItemView = {
+      ...item,
+      id: "",
+      accountKey: targetKey,
+      organizationId: null,
+      folderId: targetFolderId,
+      collectionIds: [],
+      attachments: [],
+      edit: true,
+      viewPassword: true,
+      archivedDate: null,
+    };
+    if (copy.login) copy.login = { ...copy.login, passkeys: 0, fido2: undefined };
+    const created = await this.saveItem(targetKey, copy, true, { importPasskeys: passkeys });
+    if (!created?.id) throw new Error(t("Kopieren fehlgeschlagen"));
+
+    // one attachment at a time: download, decrypt, re-encrypt and upload, then let it go
+    const attachmentsFailed: string[] = [];
+    for (const a of item.attachments) {
+      try {
+        const plain = await this.attachmentPlain(sourceKey, itemId, a.id);
+        await this.putAttachment(targetKey, created.id, a.fileName, plain);
+      } catch (e: any) {
+        console.warn("copy attachment failed", e?.message ?? String(e));
+        attachmentsFailed.push(a.fileName);
+      }
+    }
+    await this.sync(targetKey).catch((e) => console.warn("sync after copy failed", e?.message ?? String(e)));
+    return { id: created.id, attachmentsFailed };
   }
 
   // -------------------------------------------------------------------------------------------
@@ -1982,6 +2073,17 @@ export class VaultService {
     }
     return out;
   }
+}
+
+/** Largest attachment accepted for upload (like the official clients). */
+const MAX_ATTACHMENT = 500 * 1024 * 1024;
+
+/** Some field was replaced by the "decryption failed" text: copying it would store that text as data. */
+function hasDecryptFailure(item: ItemView): boolean {
+  const marker = t("[Entschlüsselung fehlgeschlagen]");
+  const walk = (v: unknown): boolean =>
+    typeof v === "string" ? v === marker : Array.isArray(v) ? v.some(walk) : !!v && typeof v === "object" && Object.values(v).some(walk);
+  return walk(item);
 }
 
 /** Upload to Azure blob storage (Bitwarden cloud), as the official clients do. */

@@ -33,14 +33,26 @@ const PASSKEY_FIELDS = [
   "discoverable",
 ];
 
-async function plainPasskeys(raw: any, keys: AccountKeys): Promise<any[] | undefined> {
+/**
+ * Passkeys of a raw cipher in plain form (Bitwarden export format). `strict`: a field that cannot be
+ * decrypted throws instead of becoming empty (copying must not produce a broken passkey).
+ */
+export async function plainPasskeys(raw: any, keys: AccountKeys, strict = false): Promise<any[] | undefined> {
   const list = raw?.login?.fido2Credentials;
   if (!Array.isArray(list) || !list.length) return undefined;
   const key = await cipherKeyFor(raw, keys);
   const out: any[] = [];
   for (const f of list) {
     const o: any = {};
-    for (const k of PASSKEY_FIELDS) o[k] = f[k] ? await decryptString(f[k], key).catch(() => "") : k === "discoverable" ? "false" : "";
+    for (const k of PASSKEY_FIELDS)
+      o[k] = f[k]
+        ? await decryptString(f[k], key).catch((e) => {
+            if (strict) throw e;
+            return "";
+          })
+        : k === "discoverable"
+          ? "false"
+          : "";
     o.creationDate = f.creationDate ?? new Date().toISOString();
     out.push(o);
   }

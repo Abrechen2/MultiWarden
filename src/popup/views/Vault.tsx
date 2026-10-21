@@ -689,6 +689,17 @@ export function ItemRow({ item, suggestion, multi }: { item: ItemView; suggestio
             >
               {item.favorite ? t("Aus Favoriten entfernen") : t("Zu Favoriten hinzufügen")}
             </MenuItem>
+            {actions.canCopyToAccount && (
+              <MenuItem
+                icon="copy"
+                onClick={() => {
+                  setMoreOpen(false);
+                  actions.copyToAccount();
+                }}
+              >
+                <span data-testid="menu-copy-account">{t("In anderes Konto kopieren")}</span>
+              </MenuItem>
+            )}
             {multi && acc && (
               <>
                 <div class="menu-sep" />

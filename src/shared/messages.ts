@@ -289,6 +289,11 @@ export interface Rpc {
     res: { ok: boolean; error?: string; item?: ItemView };
   };
   setItemCollections: { req: { accountKey: string; itemId: string; collectionIds: string[] }; res: { ok: boolean; error?: string } };
+  /** copy an item into the personal vault of another unlocked account (extension pages only) */
+  copyItemToAccount: {
+    req: { accountKey: string; itemId: string; targetAccountKey: string; folderId: string | null };
+    res: { ok: boolean; error?: string; id?: string; attachmentsFailed?: string[] };
+  };
   // inline menu
   inlineMenuToken: { req: { url: string; kind: MenuKind; opid?: string }; res: { token: string | null } };
   inlineMenuData: { req: { token: string }; res: InlineMenuData };
