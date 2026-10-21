@@ -2,8 +2,19 @@
 // optional in-field icon, autofill on page load and the "save login?" capture.
 import type { CollectResult, FillData, LoginCapture, MenuKind } from "../shared/messages";
 import { isBlockedUrl } from "../shared/uri";
-import { allInputs, fieldOptions, FormField, isPasswordField, isTextLike, isUsernameField, isVisible, menuKindOf } from "./fields";
-import { collect, fill, findPairs, opidOf } from "./fill";
+import {
+  allInputs,
+  composedParent,
+  fieldOptions,
+  FormField,
+  isPasswordField,
+  isTextLike,
+  isUsernameField,
+  isVisible,
+  menuKindOf,
+} from "./fields";
+import { collect, fill, FillGuard, findPairs, opidOf } from "./fill";
+import { filterFactor, Intent, intentAllows, MIN_MENU_OPACITY } from "./guard";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -11,7 +22,7 @@ declare global {
   // eslint-disable-next-line no-var
   var __mwCollect: (() => CollectResult) | undefined;
   // eslint-disable-next-line no-var
-  var __mwFill: ((d: FillData) => { filled: number }) | undefined;
+  var __mwFill: ((d: FillData & FillGuard) => { filled: number }) | undefined;
 }
 
 /** settings the page side needs (read from extension storage, kept up to date) */
@@ -35,6 +46,29 @@ function applySettings(s: any) {
 const blocked = () => isBlockedUrl(location.href, cfg.blocked);
 
 // ---------------------------------------------------------------------------------------------
+// Our elements in the page: every style property is set !important (with "all: initial" first), so no
+// page stylesheet can make them transparent, move or shrink them. Changes to their attributes are
+// treated as tampering.
+
+const ownStyle = new WeakMap<HTMLElement, string>();
+
+function setStyles(el: HTMLElement, props: Record<string, string>) {
+  for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v, "important");
+  ownStyle.set(el, el.getAttribute("style") ?? "");
+}
+
+/** Calls `onTamper` whenever the page changes an attribute of `el` (our own style writes excepted). */
+function watchAttributes(el: HTMLElement, onTamper: () => void): MutationObserver {
+  const mo = new MutationObserver((records) => {
+    if (records.some((r) => r.attributeName !== "style" || el.getAttribute("style") !== ownStyle.get(el))) onTamper();
+  });
+  mo.observe(el, { attributes: true });
+  return mo;
+}
+
+const HOST_BASE = { all: "initial", position: "fixed", display: "block", border: "0", margin: "0", padding: "0" };
+
+// ---------------------------------------------------------------------------------------------
 // Inline menu
 
 let menuHost: HTMLElement | null = null;
@@ -44,13 +78,68 @@ let menuToken = "";
 let menuHeight = 0;
 let suppressUntil = 0;
 let dismissedField: HTMLInputElement | null = null;
+/** last genuine user interaction (only these open the menu, a scripted focus() does not) */
+let intent: Intent | null = null;
+/** where and how large the menu host was placed, to detect scaling / moving by the page */
+let menuBox = { left: 0, top: 0, width: 0, height: 0 };
+let menuWatch: MutationObserver[] = [];
+let recheckQueued = false;
 
 function closeMenu() {
+  menuWatch.forEach((mo) => mo.disconnect());
+  menuWatch = [];
   menuHost?.remove();
   menuHost = null;
   menuFrame = null;
   menuField = null;
   menuToken = "";
+}
+
+const labelsOf = (el: HTMLInputElement): Element[] => Array.from(el.labels ?? []);
+
+/**
+ * The menu host is really on screen as we placed it: fully opaque through all ancestors, not filtered,
+ * clipped, masked or scaled, inside the viewport and not covered by other content. Overlays with
+ * `pointer-events: none` are invisible to hit testing – the menu page checks those itself where the
+ * browser can (IntersectionObserver v2).
+ */
+function menuRendered(): boolean {
+  const host = menuHost;
+  if (!host || !host.isConnected) return false;
+  let opacity = 1;
+  for (let a: Element | null = host; a; a = composedParent(a)) {
+    const cs = getComputedStyle(a);
+    if (cs.display === "none") return false;
+    if (a === host && cs.visibility !== "visible") return false;
+    opacity *= parseFloat(cs.opacity) * filterFactor(cs.filter);
+    const mask = cs.getPropertyValue("mask-image") || cs.getPropertyValue("-webkit-mask-image");
+    if (a !== host && ((cs.clipPath && cs.clipPath !== "none") || (mask && mask !== "none"))) return false;
+  }
+  if (opacity < MIN_MENU_OPACITY) return false;
+  const r = host.getBoundingClientRect();
+  if (Math.abs(r.width - menuBox.width) > 2 || Math.abs(r.left - menuBox.left) > 2 || Math.abs(r.top - menuBox.top) > 2) return false;
+  if (menuBox.height > 0 && Math.abs(r.height - menuBox.height) > 2) return false;
+  if (r.left < -1 || r.top < -1 || r.right > window.innerWidth + 1 || r.top >= window.innerHeight) return false;
+  if (menuBox.height > 0) {
+    // nothing painted on top of it (top entries, middle, bottom of the visible part)
+    const x = r.left + r.width / 2;
+    const bottom = Math.min(r.bottom, window.innerHeight) - 1;
+    for (const y of [r.top + Math.min(20, r.height / 2), (r.top + bottom) / 2, bottom - 4]) {
+      if (y < r.top || y >= window.innerHeight) continue;
+      if (document.elementFromPoint(x, y) !== host) return false;
+    }
+  }
+  return true;
+}
+
+/** Check the menu again after the page changed something that can affect it (once per frame). */
+function queueRecheck() {
+  if (recheckQueued || !menuHost) return;
+  recheckQueued = true;
+  requestAnimationFrame(() => {
+    recheckQueued = false;
+    if (menuHost && menuHeight > 0 && !menuRendered()) closeMenu();
+  });
 }
 
 function positionMenu() {
@@ -66,7 +155,13 @@ function positionMenu() {
   if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
   let top = r.bottom + 4;
   if (top + menuHeight > window.innerHeight - 8 && r.top - menuHeight - 4 > 8) top = r.top - menuHeight - 4;
-  Object.assign(menuHost.style, { top: top + "px", left: left + "px", width: width + "px", height: menuHeight + "px" });
+  const box = { left, top, width, height: menuHeight };
+  const moved = box.left !== menuBox.left || box.top !== menuBox.top || box.width !== menuBox.width || box.height !== menuBox.height;
+  menuBox = box;
+  setStyles(menuHost, { top: top + "px", left: left + "px", width: width + "px", height: menuHeight + "px" });
+  // the menu ignores clicks for a moment after it appeared or moved (it cannot be slid under a click)
+  if (moved) menuFrame?.contentWindow?.postMessage({ mwToken: menuToken, moved: true }, "*");
+  if (menuHeight > 0 && !menuRendered()) closeMenu();
 }
 
 const isFocused = (field: HTMLInputElement) => document.activeElement === field || (field.getRootNode() as any).activeElement === field;
@@ -74,6 +169,7 @@ const isFocused = (field: HTMLInputElement) => document.activeElement === field 
 async function openMenu(field: HTMLInputElement, kind: MenuKind) {
   if (menuField === field && menuHost) return;
   closeMenu();
+  if (!isVisible(field)) return;
   let res: any;
   try {
     res = await chrome.runtime.sendMessage({ rpc: "inlineMenuToken", args: { url: location.href, kind, opid: opidOf(field) } });
@@ -85,11 +181,9 @@ async function openMenu(field: HTMLInputElement, kind: MenuKind) {
   menuToken = res.data.token;
   menuField = field;
   menuHeight = 0;
+  menuBox = { left: 0, top: 0, width: 0, height: 0 };
   const host = document.createElement("mw-inline-menu");
-  host.setAttribute(
-    "style",
-    "all: initial; position: fixed; z-index: 2147483647; display: block; border: 0; margin: 0; padding: 0; height: 0;",
-  );
+  setStyles(host, { ...HOST_BASE, "z-index": "2147483647", height: "0" });
   const shadow = host.attachShadow({ mode: "closed" });
   const frame = document.createElement("iframe");
   frame.src = chrome.runtime.getURL("inline-menu.html") + "#" + encodeURIComponent(menuToken);
@@ -103,6 +197,13 @@ async function openMenu(field: HTMLInputElement, kind: MenuKind) {
   menuHost = host;
   menuFrame = frame;
   (document.body ?? document.documentElement).appendChild(host);
+  // the page touching our element closes the menu; restyling html/body or adding stylesheets re-checks it
+  menuWatch = [watchAttributes(host, closeMenu)];
+  const pageMo = new MutationObserver(queueRecheck);
+  pageMo.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class", "hidden"] });
+  if (document.body) pageMo.observe(document.body, { attributes: true, attributeFilter: ["style", "class", "hidden"] });
+  if (document.head) pageMo.observe(document.head, { childList: true, subtree: true, characterData: true });
+  menuWatch.push(pageMo);
   positionMenu();
 }
 
@@ -136,7 +237,7 @@ function positionIcon() {
   }
   const r = iconField.getBoundingClientRect();
   const size = Math.max(16, Math.min(24, r.height - 6));
-  Object.assign(iconHost.style, {
+  setStyles(iconHost, {
     top: r.top + (r.height - size) / 2 + "px",
     left: r.right - size - 6 + "px",
     width: size + "px",
@@ -148,7 +249,7 @@ function showIcon(field: HTMLInputElement, kind: MenuKind) {
   if (iconField === field && iconHost) return;
   hideIcon();
   const host = document.createElement("mw-inline-button");
-  host.setAttribute("style", "all: initial; position: fixed; z-index: 2147483646; display: block;");
+  setStyles(host, { ...HOST_BASE, "z-index": "2147483646" });
   const shadow = host.attachShadow({ mode: "closed" });
   const btn = document.createElement("button");
   btn.type = "button";
@@ -269,8 +370,23 @@ function captureLogin(origin: Element | null) {
 let barHost: HTMLElement | null = null;
 let barFrame: HTMLIFrameElement | null = null;
 let barToken = "";
+let barHeight = 0;
+let barWatch: MutationObserver | null = null;
+let barRestores = 0;
+/** a page that keeps fighting the style restore gets the bar closed */
+const MAX_BAR_RESTORES = 5;
+const BAR_STYLE = {
+  ...HOST_BASE,
+  "z-index": "2147483647",
+  top: "12px",
+  right: "12px",
+  width: "min(420px, calc(100vw - 24px))",
+  height: "0",
+};
 
 function closeBar() {
+  barWatch?.disconnect();
+  barWatch = null;
   barHost?.remove();
   barHost = null;
   barFrame = null;
@@ -281,10 +397,9 @@ function showBar(token: string) {
   closeBar();
   barToken = token;
   const host = document.createElement("mw-notification");
-  host.setAttribute(
-    "style",
-    "all: initial; position: fixed; z-index: 2147483647; top: 12px; right: 12px; width: min(420px, calc(100vw - 24px)); height: 0; display: block;",
-  );
+  barHeight = 0;
+  barRestores = 0;
+  setStyles(host, BAR_STYLE);
   const shadow = host.attachShadow({ mode: "closed" });
   const frame = document.createElement("iframe");
   frame.src = chrome.runtime.getURL("notification.html") + "#" + encodeURIComponent(token);
@@ -297,6 +412,12 @@ function showBar(token: string) {
   barHost = host;
   barFrame = frame;
   (document.body ?? document.documentElement).appendChild(host);
+  barWatch = watchAttributes(host, () => {
+    if (++barRestores > MAX_BAR_RESTORES) return closeBar();
+    for (const a of Array.from(host.attributes)) if (a.name !== "style") host.removeAttribute(a.name);
+    host.removeAttribute("style");
+    setStyles(host, { ...BAR_STYLE, height: barHeight + "px" });
+  });
 }
 
 function candidateField(t: EventTarget | null): { el: HTMLInputElement; kind: MenuKind } | null {
@@ -376,7 +497,48 @@ function init() {
         return;
       }
       if (c.el === dismissedField) return;
+      // a page can focus() a field by script; only a click / Tab / typing by the user opens the menu
+      if (!intentAllows(intent, c.el, labelsOf(c.el), Date.now())) return;
       openMenu(c.el, c.kind);
+    },
+    true,
+  );
+
+  // genuine user interaction (trusted events only)
+  document.addEventListener(
+    "pointerdown",
+    (ev) => {
+      if (!ev.isTrusted) return;
+      const t = ev.composedPath()[0];
+      if (!(t instanceof Element)) return;
+      intent = { at: Date.now(), via: "pointer", target: t.closest("label") ?? t };
+      if (cfg.onIcon || !cfg.inlineMenu || blocked() || Date.now() < suppressUntil) return;
+      // the field already has the focus (autofocus, scripted focus): no focusin follows the click
+      const c = candidateField(t);
+      if (c && isFocused(c.el) && !(menuField === c.el && menuHost) && c.el !== dismissedField) {
+        const { el, kind } = c;
+        setTimeout(() => {
+          if (isFocused(el)) openMenu(el, kind);
+        }, 0);
+      }
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    (ev) => {
+      if (!ev.isTrusted) return;
+      if (ev.key === "Tab") {
+        intent = { at: Date.now(), via: "tab", target: null };
+        return;
+      }
+      const typing = ev.key.length === 1 || ev.key === "Backspace" || ev.key === "Delete" || ev.key === "ArrowDown";
+      const t = ev.composedPath()[0];
+      if (!typing || !(t instanceof HTMLInputElement)) return;
+      intent = { at: Date.now(), via: "key", target: t };
+      if (menuHost || cfg.onIcon || !cfg.inlineMenu || blocked() || t === dismissedField) return;
+      const c = candidateField(t);
+      if (c && isFocused(c.el)) openMenu(c.el, c.kind);
     },
     true,
   );
@@ -420,7 +582,7 @@ function init() {
       if (iconHost && path.includes(iconHost)) return;
       if (menuHost && !path.includes(menuHost) && !path.includes(menuField as any)) closeMenu();
       // clicking a dismissed field re-opens the menu
-      if (cfg.onIcon || !cfg.inlineMenu || blocked()) return;
+      if (!ev.isTrusted || cfg.onIcon || !cfg.inlineMenu || blocked()) return;
       const c = candidateField(path[0] ?? null);
       if (c && c.el === dismissedField) {
         dismissedField = null;
@@ -463,7 +625,10 @@ function init() {
       if (!barFrame || ev.source !== barFrame.contentWindow) return;
       const d = ev.data;
       if (!d || typeof d !== "object" || d.mwNotify !== barToken) return;
-      if (typeof d.height === "number" && barHost) barHost.style.height = Math.max(0, Math.min(d.height, 480)) + "px";
+      if (typeof d.height === "number" && barHost) {
+        barHeight = Math.max(0, Math.min(d.height, 480));
+        setStyles(barHost, { height: barHeight + "px" });
+      }
       if (d.close) closeBar();
     },
     true,
@@ -473,6 +638,11 @@ function init() {
   window.addEventListener("resize", () => positionMenu(), { passive: true });
   globalThis.__mwCollect = collect;
   globalThis.__mwFill = (d) => {
+    // a fill for the menu's field comes from a click in the menu: the menu must really have been visible
+    if (d.targetOpid && (!menuHost || !menuField || opidOf(menuField) !== d.targetOpid || !menuRendered())) {
+      closeMenu();
+      return { filled: 0 };
+    }
     suppressUntil = Date.now() + 600;
     const r = fill(d);
     closeMenu();

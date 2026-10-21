@@ -218,9 +218,10 @@ export interface Rpc {
   loginDevice: { req: { server: ServerType; baseUrl?: string; email: string }; res: LoginFlowPublic };
   authRequests: {
     req: Record<string, never>;
-    res: { requests: { accountKey: string; id: string; device: string; ip: string; created: number; fingerprint: string }[] };
+    res: { requests: { accountKey: string; id: string; device: string; ip: string; created: number; fingerprint: string; publicKey: string }[] };
   };
-  authRequestRespond: { req: { accountKey: string; id: string; approve: boolean }; res: { ok: true } };
+  /** publicKey: the key whose fingerprint was shown; approval fails if the server's key differs */
+  authRequestRespond: { req: { accountKey: string; id: string; approve: boolean; publicKey?: string }; res: { ok: true } };
   fingerprint: { req: { accountKey: string }; res: { phrase: string } };
   devices: {
     req: { accountKey: string };
@@ -393,6 +394,8 @@ export interface CollectResult {
 
 /** Data sent to a frame to fill (content/fill.ts). */
 export interface FillData {
+  /** origin of the frame the background matched; the content side refuses to fill if it navigated since */
+  expectOrigin?: string;
   kind?: "login" | "card" | "identity" | "generated";
   username?: string;
   password?: string;

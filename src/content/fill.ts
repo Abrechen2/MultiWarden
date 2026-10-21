@@ -504,10 +504,12 @@ function fillCustomFields(d: FillData, inputs: HTMLInputElement[], done: HTMLEle
   const fields = d.fields ?? [];
   if (!fields.length) return;
   const spans = autofillSpans();
+  // never into fields the user cannot see (custom fields of cards / identities hold secrets too)
+  const visible = inputs.filter((i) => isVisible(i));
   for (const f of fields) {
     if (!f.name) continue;
     const n = f.name.toLowerCase();
-    const el = inputs.find((i) => [i.name, i.id, labelText(i), i.placeholder].some((x) => x && x.toLowerCase() === n));
+    const el = visible.find((i) => [i.name, i.id, labelText(i), i.placeholder].some((x) => x && x.toLowerCase() === n));
     if (el && !isPasswordField(el) && el.type !== "hidden") {
       if (el.type === "checkbox" || el.type === "radio") {
         const want = /^(true|1|yes|ja|on)$/i.test(f.value);
@@ -562,12 +564,33 @@ function fillGenerated(d: FillData): HTMLElement[] {
   return done;
 }
 
-export function fill(d: FillData): { filled: number } {
+/**
+ * What the background checked before asking to fill: the frame's origin (and, for logins, the URL).
+ * The frame may have navigated between that check and this call (the background addresses it by
+ * frame id only), so the fill is refused when the page is no longer the one that was matched.
+ */
+export interface FillGuard {
+  expectOrigin?: string;
+  expectUrl?: string;
+}
+
+const withoutHash = (u: string) => u.split("#")[0];
+
+/** The frame still shows the origin / URL the background matched. */
+export function sameTarget(g: FillGuard, loc: { origin: string; href: string }): boolean {
+  if (g.expectOrigin != null && g.expectOrigin !== loc.origin) return false;
+  if (g.expectUrl != null && withoutHash(g.expectUrl) !== withoutHash(loc.href)) return false;
+  return true;
+}
+
+export function fill(d: FillData & FillGuard): { filled: number } {
+  if (!sameTarget(d, location)) return { filled: 0 };
   let done: HTMLElement[] = [];
   const target = elementByOpid(d.targetOpid);
   if (d.kind === "generated") done = fillGenerated(d);
   else if (d.kind === "card" || d.kind === "identity") {
-    const scope = target ? scopeOf(target) : allFormFields().filter((f) => !f.disabled && isVisible(f));
+    // only fields the user can see – hidden inputs next to a visible one must not collect card / address data
+    const scope = (target ? scopeOf(target) : allFormFields()).filter((f) => !f.disabled && isVisible(f));
     if (d.kind === "card" && d.card) {
       // cross-origin frames only hold payment fields (e.g. hosted card number / CVC frames)
       if (d.requireCardNumber) {

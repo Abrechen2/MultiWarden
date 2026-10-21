@@ -8,7 +8,19 @@ import "./inline-menu.css";
 
 import { initLanguage, t } from "../shared/i18n";
 import { initAppearance } from "../shared/appearance";
+import { ArmState, isArmed } from "./arming";
 const token = decodeURIComponent(location.hash.slice(1));
+
+// Entries ignore clicks / Enter right after the menu appeared or moved and while the browser reports it
+// as covered: a page must not be able to slide the menu under a click aimed at its own content.
+const arm: ArmState = { shownAt: performance.now(), occluded: false };
+const rearm = () => {
+  arm.shownAt = performance.now();
+};
+const armed = () => isArmed(arm, performance.now());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") rearm();
+});
 
 async function rpc(name: string, args: any) {
   const r = await chrome.runtime.sendMessage({ rpc: name, args });
@@ -72,6 +84,7 @@ function Menu() {
     chrome.runtime.onMessage.addListener(l);
     const onMsg = (ev: MessageEvent) => {
       if (ev.source !== window.parent || ev.data?.mwToken !== token) return;
+      if (ev.data.moved) rearm();
       if (ev.data.focusFirst) root.current?.querySelector<HTMLElement>("button")?.focus();
     };
     window.addEventListener("message", onMsg);
@@ -80,6 +93,33 @@ function Menu() {
       window.removeEventListener("message", onMsg);
     };
   }, []);
+
+  // new entries under the pointer count as "appeared"
+  useEffect(rearm, [data]);
+
+  // IntersectionObserver v2 (Chromium): occlusion by other content – also by pointer-events: none
+  // overlays the page side cannot detect – and transparency of the frame and its ancestors
+  useEffect(() => {
+    if (!root.current) return;
+    let io: IntersectionObserver | undefined;
+    try {
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            const visible = (e as any).isVisible;
+            if (typeof visible !== "boolean") return; // no v2 support (Firefox)
+            if (visible && arm.occluded) rearm();
+            arm.occluded = !visible;
+          }
+        },
+        { trackVisibility: true, delay: 100, threshold: [0, 1] } as IntersectionObserverInit,
+      );
+      io.observe(root.current);
+    } catch {
+      /* not supported */
+    }
+    return () => io?.disconnect();
+  }, [root.current]);
 
   useEffect(() => {
     if (!root.current) return;
@@ -129,6 +169,7 @@ function Menu() {
             disabled={!!busy}
             data-testid="inline-generate"
             onClick={async () => {
+              if (!armed()) return;
               setBusy("gen");
               try {
                 const r = await rpc("inlineMenuFillGenerated", { token });
@@ -178,6 +219,7 @@ function Menu() {
               disabled={!!busy}
               data-testid="inline-passkey"
               onClick={async () => {
+                if (!armed()) return;
                 setBusy("pk" + pk.accountKey + pk.itemId);
                 try {
                   const r = await rpc("inlineMenuPasskey", { token, accountKey: pk.accountKey, itemId: pk.itemId });
@@ -214,6 +256,7 @@ function Menu() {
               disabled={!!busy}
               data-testid="inline-item"
               onClick={async () => {
+                if (!armed()) return;
                 setBusy(it.accountKey + it.id);
                 try {
                   await rpc("inlineMenuFill", { token, accountKey: it.accountKey, itemId: it.id });

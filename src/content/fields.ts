@@ -1,4 +1,5 @@
 // Field discovery and classification (logins, new passwords, TOTP, payment cards, identities).
+import { clipHidesAll, clipPathHidesAll, filterFactor, MIN_FIELD_OPACITY } from "./guard";
 
 export type FormField = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
@@ -92,12 +93,61 @@ function allElements(selector: string): Element[] {
   return out;
 }
 
+/** Parent in the flat tree (slot, then parent element, then shadow host). */
+export function composedParent(el: Element): Element | null {
+  return el.assignedSlot ?? el.parentElement ?? ((el.getRootNode() as ShadowRoot).host || null);
+}
+
+/**
+ * The user can actually see the field: rendered, not (nearly) transparent through itself or an ancestor,
+ * not clipped away, not pushed out of the document and – when on screen – not covered by other content.
+ * Pages hide fields this way to get card / identity data filled into inputs the user never sees.
+ */
 export function isVisible(el: HTMLElement): boolean {
   if (!el.isConnected) return false;
+  // closed <details>, content-visibility, display: none anywhere above (Chrome 105+, Firefox 106+)
+  if (typeof el.checkVisibility === "function" && !el.checkVisibility({ contentVisibilityAuto: true } as any)) return false;
   const r = el.getBoundingClientRect();
   if (r.width < 2 || r.height < 2) return false;
   const st = getComputedStyle(el);
-  if (st.visibility === "hidden" || st.display === "none" || parseFloat(st.opacity) < 0.05) return false;
+  if (st.visibility !== "visible" || st.display === "none") return false;
+  // outside the document: above / left of it, or right of the viewport (forms do not scroll sideways)
+  if (r.bottom + window.scrollY <= 0 || r.right <= 0 || r.left >= window.innerWidth) return false;
+  let opacity = 1;
+  let box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  for (let a: Element | null = el; a; a = composedParent(a)) {
+    const cs = a === el ? st : getComputedStyle(a);
+    if (cs.display === "none") return false;
+    opacity *= parseFloat(cs.opacity) * filterFactor(cs.filter);
+    if (opacity < MIN_FIELD_OPACITY) return false;
+    if (clipPathHidesAll(cs.clipPath) || (cs.position === "absolute" || cs.position === "fixed" ? clipHidesAll(cs.clip) : false))
+      return false;
+    if (a !== el && /hidden|clip/.test(cs.overflowX + cs.overflowY) && a !== document.documentElement && a !== document.body) {
+      // an ancestor that cuts off its overflow (not a scroll container – those can be scrolled to)
+      const ar = a.getBoundingClientRect();
+      box = {
+        left: Math.max(box.left, ar.left),
+        top: Math.max(box.top, ar.top),
+        right: Math.min(box.right, ar.right),
+        bottom: Math.min(box.bottom, ar.bottom),
+      };
+      if (box.right - box.left < 2 || box.bottom - box.top < 2) return false;
+    }
+  }
+  return !isCovered(el, r);
+}
+
+/** Another element is painted over the centre of the (on-screen) field. */
+function isCovered(el: HTMLElement, r: DOMRect): boolean {
+  const x = r.left + r.width / 2;
+  const y = r.top + r.height / 2;
+  if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return false; // below the fold: scrollable
+  const root = el.getRootNode() as Document | ShadowRoot;
+  const hit = (root.elementFromPoint ? root.elementFromPoint(x, y) : document.elementFromPoint(x, y)) as Element | null;
+  if (!hit || hit === el || el.contains(hit)) return false;
+  // its own label drawn on top (floating labels)
+  const labels = (el as HTMLInputElement).labels;
+  if (labels) for (const l of Array.from(labels)) if (l === hit || l.contains(hit)) return false;
   return true;
 }
 
