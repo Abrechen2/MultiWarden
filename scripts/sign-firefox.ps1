@@ -19,6 +19,8 @@ if (-not $secret) {
 }
 if (-not $issuer -or -not $secret) { throw "AMO credentials missing." }
 
+# MW_TEST would compile the test hook (decrypted state on globalThis) into the build; never sign that
+Remove-Item Env:MW_TEST -ErrorAction SilentlyContinue
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "Build failed." }
 
