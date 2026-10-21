@@ -83,6 +83,100 @@ function groupLabel(items: ItemView[], key: string): string {
   }
 }
 
+/** One compared field of a duplicate group. */
+export interface FieldDiff {
+  /** "name", "username", "password", "totp", "uris", "notes", "folder", "passkeys", "card:<k>", "identity:<k>", "field:<name>" … */
+  key: string;
+  same: boolean;
+  /** secrets are never handed to the UI as values, only as variants */
+  secret: boolean;
+  /** per item (group order): the value to show, undefined for secrets and empty values */
+  values: (string | undefined)[];
+  /** per item: index of the distinct value in order of first appearance, -1 = empty */
+  variants: number[];
+}
+
+/** Card / identity / extra keys that hold secrets (shown only as variants). */
+const SECRET_KEY = /number|ssn|iban|pin|code|cvv|password|secret|private/i;
+const HIDDEN_FIELD = 1; // FieldType.Hidden
+
+type Getter = { key: string; secret: boolean; get: (i: ItemView) => string };
+
+function gettersFor(items: ItemView[], folderName: (i: ItemView) => string): Getter[] {
+  const g: Getter[] = [{ key: "name", secret: false, get: (i) => i.name }];
+  const keysOf = (pick: (i: ItemView) => Record<string, string | undefined> | undefined) =>
+    [...new Set(items.flatMap((i) => Object.keys(pick(i) ?? {})))].sort();
+  switch (items[0].type) {
+    case CipherType.Login:
+      g.push(
+        { key: "username", secret: false, get: (i) => i.login?.username ?? "" },
+        { key: "password", secret: true, get: (i) => i.login?.password ?? "" },
+        { key: "totp", secret: true, get: (i) => i.login?.totp ?? "" },
+        {
+          key: "uris",
+          secret: false,
+          get: (i) => [...new Set((i.login?.uris ?? []).map((u) => u.uri.trim()).filter(Boolean))].sort().join(", "),
+        },
+        { key: "passkeys", secret: false, get: (i) => (i.login?.passkeys ? String(i.login.passkeys) : "") },
+      );
+      break;
+    case CipherType.Card:
+      for (const k of keysOf((i) => i.card)) g.push({ key: "card:" + k, secret: k === "number" || k === "code", get: (i) => i.card?.[k] ?? "" });
+      break;
+    case CipherType.Identity:
+      for (const k of keysOf((i) => i.identity)) g.push({ key: "identity:" + k, secret: SECRET_KEY.test(k), get: (i) => i.identity?.[k] ?? "" });
+      break;
+    case CipherType.SshKey:
+      for (const k of keysOf((i) => i.sshKey)) g.push({ key: "ssh:" + k, secret: k === "privateKey", get: (i) => i.sshKey?.[k] ?? "" });
+      break;
+    case CipherType.SecureNote:
+      break;
+    default:
+      for (const k of keysOf((i) => i.extra)) g.push({ key: "extra:" + k, secret: SECRET_KEY.test(k), get: (i) => i.extra?.[k] ?? "" });
+  }
+  // notes often carry secrets (recovery codes …)
+  g.push({ key: "notes", secret: true, get: (i) => i.notes ?? "" });
+  for (const name of [...new Set(items.flatMap((i) => i.fields.map((f) => f.name)))].sort()) {
+    const field = (i: ItemView) => i.fields.find((f) => f.name === name);
+    g.push({
+      key: "field:" + name,
+      secret: items.some((i) => field(i)?.type === HIDDEN_FIELD),
+      get: (i) => field(i)?.value ?? "",
+    });
+  }
+  g.push({ key: "folder", secret: false, get: folderName });
+  return g;
+}
+
+/**
+ * Field-by-field comparison of a duplicate group: what is the same in all entries and what differs.
+ * Fields empty in every entry are left out; differing fields come first. Secret values are not
+ * returned, only which entries share the same value (variants).
+ */
+export function compareGroup(items: ItemView[], folderName: (i: ItemView) => string): FieldDiff[] {
+  if (!items.length) return [];
+  const out: FieldDiff[] = [];
+  for (const { key, secret, get } of gettersFor(items, folderName)) {
+    const raw = items.map((i) => get(i).trim());
+    if (raw.every((v) => !v)) continue;
+    const distinct: string[] = [];
+    const variants = raw.map((v) => {
+      if (!v) return -1;
+      let idx = distinct.indexOf(v);
+      if (idx < 0) idx = distinct.push(v) - 1;
+      return idx;
+    });
+    out.push({
+      key,
+      same: variants.every((v) => v === variants[0]),
+      secret,
+      values: raw.map((v) => (secret || !v ? undefined : v)),
+      variants,
+    });
+  }
+  return [...out.filter((d) => !d.same), ...out.filter((d) => d.same)];
+}
+
 /**
  * Groups of duplicate entries (at least two each). Deleted entries and entries that could not be
  * decrypted are ignored. Logins are duplicates when they have the same username on the same website

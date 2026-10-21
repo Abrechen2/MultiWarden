@@ -1,6 +1,6 @@
 // "Tools" tab: several tools side by side (like the generator modes).
 import { useMemo, useState } from "preact/hooks";
-import { findDuplicates, DuplicateMode } from "../../shared/duplicates";
+import { compareGroup, findDuplicates, DuplicateMode } from "../../shared/duplicates";
 import { t } from "../../shared/i18n";
 import { CipherType } from "../../shared/types";
 import { useApp } from "../app-state";
@@ -9,6 +9,7 @@ import { useDialogs } from "../dialogs";
 import { Icon } from "../icons";
 import { call } from "../rpc";
 import { formatDate, itemKey, TYPE_LABEL } from "../util";
+import { DupCompareSummary, DupItemDiffs } from "./dup-compare";
 import { SendTool } from "./Send";
 import { PasswordReportTool } from "./PasswordReport";
 import { isSendLink, SendReceiveTool } from "./SendReceive";
@@ -145,6 +146,13 @@ function DuplicatesTool() {
           </div>
           {groups.map((g) => {
             const removable = g.items.slice(1).filter((i) => i.edit);
+            const placeOf = (i: (typeof g.items)[number]) =>
+              (i.organizationId
+                ? app.vault.organizations.find((o) => o.accountKey === i.accountKey && o.id === i.organizationId)?.name
+                : i.folderId
+                  ? app.vault.folders.find((f) => f.accountKey === i.accountKey && f.id === i.folderId)?.name
+                  : "") ?? "";
+            const diff = compareGroup(g.items, placeOf);
             return (
               <section class="dup-group" key={g.key} data-testid="dup-group">
                 <div class="dup-head">
@@ -178,6 +186,7 @@ function DuplicatesTool() {
                     </button>
                   )}
                 </div>
+                <DupCompareSummary diff={diff} />
                 <div class="card">
                   {g.items.map((i, idx) => {
                     const folder = i.folderId
@@ -213,6 +222,7 @@ function DuplicatesTool() {
                                 .join(" · ")}
                             </span>
                           </div>
+                          <DupItemDiffs diff={diff} idx={idx} />
                         </div>
                         <div class="actions" onClick={(e) => e.stopPropagation()}>
                           {i.edit && (

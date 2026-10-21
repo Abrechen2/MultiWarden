@@ -1759,3 +1759,51 @@ button.link:focus-visible {
   gap: 10px;
   margin-top: 10px;
 }
+
+/* duplicate check: what is the same / different inside a group */
+.dup-compare {
+  margin: 0 2px 6px;
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}
+.dup-compare > div {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.dup-mark {
+  font-weight: 700;
+  width: 12px;
+  flex: none;
+  text-align: center;
+}
+.dup-differ {
+  color: var(--warning);
+}
+.dup-same {
+  color: var(--success);
+}
+.dup-diffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.dup-diff {
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dup-diff .k {
+  opacity: 0.75;
+}
+.dup-diff.secret .v {
+  font-weight: 600;
+}
