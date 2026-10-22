@@ -115,6 +115,8 @@ export function isVisible(el: HTMLElement): boolean {
   if (r.bottom + window.scrollY <= 0 || r.right <= 0 || r.left >= window.innerWidth) return false;
   let opacity = 1;
   let box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  // set while walking from an absolute / fixed element up to its containing block: overflow in between does not clip it
+  let escaping: "absolute" | "fixed" | null = null;
   for (let a: Element | null = el; a; a = composedParent(a)) {
     const cs = a === el ? st : getComputedStyle(a);
     if (cs.display === "none") return false;
@@ -122,7 +124,14 @@ export function isVisible(el: HTMLElement): boolean {
     if (opacity < MIN_FIELD_OPACITY) return false;
     if (clipPathHidesAll(cs.clipPath) || (cs.position === "absolute" || cs.position === "fixed" ? clipHidesAll(cs.clip) : false))
       return false;
-    if (a !== el && /hidden|clip/.test(cs.overflowX + cs.overflowY) && a !== document.documentElement && a !== document.body) {
+    if (a !== el && escaping && (createsFixedContainingBlock(cs) || (escaping === "absolute" && cs.position !== "static"))) escaping = null;
+    if (
+      a !== el &&
+      !escaping &&
+      /hidden|clip/.test(cs.overflowX + cs.overflowY) &&
+      a !== document.documentElement &&
+      a !== document.body
+    ) {
       // an ancestor that cuts off its overflow (not a scroll container – those can be scrolled to)
       const ar = a.getBoundingClientRect();
       box = {
@@ -133,8 +142,30 @@ export function isVisible(el: HTMLElement): boolean {
       };
       if (box.right - box.left < 2 || box.bottom - box.top < 2) return false;
     }
+    if (cs.position === "fixed") escaping = "fixed";
+    else if (cs.position === "absolute" && escaping !== "fixed") escaping = "absolute";
   }
   return !isCovered(el, r);
+}
+
+/**
+ * The element is the containing block of fixed (and absolute) descendants although it is not positioned.
+ * When in doubt it must say yes: a wrong "no" would skip an overflow that really clips the field.
+ */
+function createsFixedContainingBlock(cs: CSSStyleDeclaration): boolean {
+  const willChange = cs.willChange ?? "";
+  return (
+    (cs.transform && cs.transform !== "none") ||
+    (cs.translate && cs.translate !== "none") ||
+    (cs.rotate && cs.rotate !== "none") ||
+    (cs.scale && cs.scale !== "none") ||
+    (cs.perspective && cs.perspective !== "none") ||
+    (cs.filter && cs.filter !== "none") ||
+    ((cs as any).backdropFilter && (cs as any).backdropFilter !== "none") ||
+    /paint|layout|strict|content/.test(cs.contain ?? "") ||
+    (cs.containerType && cs.containerType !== "normal") ||
+    /transform|perspective|filter|translate|rotate|scale|contain/.test(willChange)
+  ) as boolean;
 }
 
 /**

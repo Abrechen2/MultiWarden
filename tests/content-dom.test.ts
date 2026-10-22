@@ -275,6 +275,11 @@ const CARD = { number: "4111111111111111", cardholderName: "Alex Test", code: "1
       <div style="${box}"><div style="clip-path:inset(100%)"><input id="v-anc-clippath"></div></div>
       <div style="${box}"><input id="v-scale" style="transform:scale(0.01)"></div>
       <div style="${box}"><div style="width:0;height:0;overflow:hidden"><input id="v-overflow"></div></div>
+      <div style="${box};position:relative;height:30px"><div style="height:0;overflow:hidden"><div style="position:absolute;top:0;left:0"><input id="v-abs-escape"></div></div></div>
+      <div style="${box};height:30px"><div style="height:0;overflow:hidden;position:relative"><div style="position:absolute;top:0;left:0"><input id="v-abs-cb-clips"></div></div></div>
+      <div style="${box};height:30px"><div style="height:0;overflow:hidden;transform:translateZ(0)"><div style="position:absolute;top:0;left:0"><input id="v-abs-transform-clips"></div></div></div>
+      <div style="${box};position:relative;height:30px"><div style="height:0;overflow:hidden"><div style="position:absolute;top:0;left:0"><div style="height:0;overflow:hidden"><input id="v-abs-inner-clips"></div></div></div></div>
+      <div style="${box};height:30px"><div style="height:0;overflow:hidden"><div style="position:fixed;bottom:0;left:0"><input id="v-fixed-escape"></div></div></div>
       <div style="${box};position:relative"><input id="v-covered"><div style="position:absolute;inset:0;background:#fff;z-index:5"></div></div>
       <div style="${box};position:relative"><input id="v-label"><label for="v-label" style="position:absolute;left:4px;top:2px">Name</label></div>
       <div style="${box}"><div style="filter:opacity(0)"><input id="v-filter"></div></div>
@@ -298,6 +303,8 @@ const CARD = { number: "4111111111111111", cardholderName: "Alex Test", code: "1
       "v-half": true,
       "v-label": true,
       "v-shadow": true,
+      "v-abs-escape": true,
+      "v-fixed-escape": true,
       "v-details": false,
       "v-tab": false,
       "v-anc-opacity": false,
@@ -309,6 +316,9 @@ const CARD = { number: "4111111111111111", cardholderName: "Alex Test", code: "1
       "v-anc-clippath": false,
       "v-scale": false,
       "v-overflow": false,
+      "v-abs-cb-clips": false,
+      "v-abs-transform-clips": false,
+      "v-abs-inner-clips": false,
       "v-covered": false,
       "v-filter": false,
     };
