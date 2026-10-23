@@ -57,14 +57,47 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
 {
   const a = login("a1", { password: "pw1", pwDate: "2024-01-01T00:00:00Z" });
   const b = login("b1", { password: "pw2", pwDate: "2025-01-01T00:00:00Z", history: ["pw1"] });
+  // R15: the success record (at 2000 ms, 1970) is older than b's password change: b may be the newer, working one
   const ev: Evidence = { lastUsed: {}, outcomes: { a: { a1: { at: 2000, ok: true, rev: "x" } } } };
   const r = assessGroup(group([a, b], false), ev, fn);
-  check("success record beats history", r.recommended === a && r.outdated.has(b) && !r.outdated.has(a) && ids(r.removable).join() === "b1", r);
+  check("success record older than another variant's password change does not win", r.recommended === b && !r.outdated.has(b) && !r.removable.includes(b), r);
+  check("success record older than another variant's password change outdates nothing", r.outdated.size === 0 && r.removable.length === 0, r);
+}
+{
+  // regression: A and B shared P_old, success recorded for A, later the password was changed in B only
+  const recAt = Date.parse("2026-03-01T00:00:00Z");
+  const a = login("A", { password: "P_old", pwDate: "2026-01-01T00:00:00Z" });
+  const b = login("B", { password: "P_new", pwDate: "2026-05-01T00:00:00Z", history: ["P_old"] });
+  const ev: Evidence = { lastUsed: {}, outcomes: { a: { A: { at: recAt, ok: true, rev: "2026-01-01T00:00:00Z" } } } };
+  const r = assessGroup(group([a, b], false), ev, fn);
+  check("stale success: the newer password is not removable", !r.removable.includes(b) && !r.outdated.has(b), r);
+  check("stale success: the newer password is recommended by its date", r.recommended === b && !r.unclear, r);
+  check("stale success: the entry with the success record is not removed either", !r.removable.includes(a), r);
+}
+{
+  // a success record newer than every other variant's password date still wins (rule 1)
+  const a = login("a1", { password: "pw1", pwDate: "2024-01-01T00:00:00Z" });
+  const b = login("b1", { password: "pw2", pwDate: "2025-01-01T00:00:00Z", history: ["pw1"] });
+  const ev: Evidence = { lastUsed: {}, outcomes: { a: { a1: { at: Date.parse("2025-06-01T00:00:00Z"), ok: true, rev: "x" } } } };
+  const r = assessGroup(group([a, b], false), ev, fn);
+  check("newer success record wins over an older password change", r.recommended === a && !r.unclear, r);
+  check("winner does not outdate a variant whose history holds the winner's password", !r.outdated.has(b) && !r.removable.includes(b), r);
+}
+{
+  // R16: a variant outdated by a failure is removable only if another variant has a newer success record
+  const a = login("a1", { password: "pw1" });
+  const b = login("b1", { password: "pw2" });
+  const both = (aRec: OutcomeRecord, bRec: OutcomeRecord): Evidence => ({ lastUsed: {}, outcomes: { a: { a1: aRec, b1: bRec } } });
+  let r = assessGroup(group([a, b], false), both({ at: 3000, ok: true, rev: "x" }, { at: 2000, ok: false, rev: "x" }), fn);
+  check("R16 failure older than another variant's success is removable", r.recommended === a && r.outdated.has(b) && ids(r.removable).join() === "b1", r);
+  r = assessGroup(group([a, b], false), both({ at: 1000, ok: true, rev: "x" }, { at: 2000, ok: false, rev: "x" }), fn);
+  check("R16 failure newer than every success is outdated but not removable", r.outdated.has(b) && !r.removable.includes(b), r);
 }
 {
   const ev: Evidence = { lastUsed: {}, outcomes: { a: { new: { at: 2000, ok: false, rev: "x" } } } };
   const r = assessGroup(group([oldI, newI], false), ev, fn);
-  check("latest failure outdates a variant", r.outdated.has(newI) && r.recommended === oldI && ids(r.removable).join() === "new", r);
+  check("latest failure outdates a variant", r.outdated.has(newI) && r.recommended === oldI, r);
+  check("R16 failure without any success record is not removable", r.removable.length === 0, r);
 }
 {
   const ev: Evidence = { lastUsed: {}, outcomes: { a: { old: { at: 1000, ok: false, rev: "x" }, new: { at: 2000, ok: false, rev: "x" } } } };
@@ -140,7 +173,9 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   check("S1 working login is never removable", r.recommended === a && !r.removable.includes(a) && !r.outdated.has(a), r);
   // S2
   const d = mk("d1", "pw4", { pwDate: "2026-01-01T00:00:00Z" });
-  r = assessGroup(group([a, b, d], false), rec({ a1: ok(1000), b1: bad(2000) }), fn);
+  // (records after d's password date: R15 lets a newer password change beat an older success record)
+  const t0 = Date.parse("2026-02-01T00:00:00Z");
+  r = assessGroup(group([a, b, d], false), rec({ a1: ok(t0), b1: bad(t0 + 1000) }), fn);
   check("S2 failure of another variant does not block the winner", r.recommended === a && !r.unclear, r);
   // S3
   const b3 = mk("b3", "pw2", { history: ["pw1"] }), c3 = mk("c3", "pw3");
