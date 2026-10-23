@@ -23,3 +23,16 @@ export async function removeNeverDomain(host: string) {
 export async function isNeverDomain(host: string): Promise<boolean> {
   return (await neverDomains()).includes(host.toLowerCase());
 }
+
+// Websites where MultiWarden never asks whether a login worked (separate from the save list above).
+const ASK_KEY = "neverAskOutcome";
+
+export async function addNeverAskDomain(host: string) {
+  const h = host.toLowerCase();
+  const list = (await local.get<string[]>(ASK_KEY)) ?? [];
+  if (!list.includes(h)) await local.set(ASK_KEY, [...list, h]);
+}
+
+export async function isNeverAskDomain(host: string): Promise<boolean> {
+  return ((await local.get<string[]>(ASK_KEY)) ?? []).includes(host.toLowerCase());
+}

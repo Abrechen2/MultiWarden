@@ -1162,5 +1162,12 @@
  "Unklar – bitte selbst prüfen": "Pas clair – à vérifier vous-même",
  "Bereinigen": "Nettoyer",
  "Nur in diesem Eintrag: {fields}": "Uniquement dans cet élément : {fields}",
- "Nutzungsdaten konnten nicht geladen werden": "Impossible de charger les données d'utilisation"
+ "Nutzungsdaten konnten nicht geladen werden": "Impossible de charger les données d'utilisation",
+ "Hat die Anmeldung mit „{name}“ geklappt?": "La connexion avec « {name} » a-t-elle fonctionné ?",
+ "Nicht mehr fragen": "Ne plus demander",
+ "Anmelde-Ergebnis merken (für den Duplikat-Check)": "Mémoriser le résultat de la connexion (pour la vérification des doublons)",
+ "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Mémorise sur cet appareil si la connexion avec un identifiant enregistré a fonctionné – sans mots de passe",
+ "Bei unklaren Einträgen nachfragen": "Demander pour les éléments incertains",
+ "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Uniquement si le site web a plusieurs identifiants avec des mots de passe différents",
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Supprimer les résultats de connexion enregistrés"
 }

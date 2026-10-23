@@ -133,8 +133,8 @@ export interface InlineMenuPasskey {
 // Save-login notification
 
 export interface NotificationData {
-  /** none: nothing to ask (already saved, request gone …) */
-  kind: "save" | "update" | "none";
+  /** none: nothing to ask (already saved, request gone …); confirmLogin: "did the login work?" */
+  kind: "save" | "update" | "confirmLogin" | "none";
   locked: boolean;
   host: string;
   username: string;
@@ -143,6 +143,8 @@ export interface NotificationData {
   folders: { accountKey: string; id: string; name: string }[];
   /** update: items that would get the new password */
   targets: { accountKey: string; itemId: string; name: string; accountLabel: string; accountColor: string }[];
+  /** confirmLogin: the item the question is about */
+  confirmItem?: { name: string; accountLabel: string; accountColor: string };
   theme: "system" | "light" | "dark";
 }
 
@@ -333,6 +335,7 @@ export interface Rpc {
   notifyUpdate: { req: { token: string; targets: { accountKey: string; itemId: string }[] }; res: { ok: boolean; error?: string } };
   notifyNever: { req: { token: string }; res: { ok: true } };
   notifyClose: { req: { token: string }; res: { ok: true } };
+  notifyOutcome: { req: { token: string; answer: "yes" | "no" | "never" }; res: { ok: true } };
 }
 
 export interface InlineMenuItem {

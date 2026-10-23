@@ -7,6 +7,7 @@ import { isBlockedUrl, isFillableUrl } from "../shared/uri";
 import { CipherType, type OutcomeRecord } from "../shared/types";
 import {
   activeTab,
+  collectFrames,
   FILL_INSECURE,
   FILL_MISMATCH,
   fillItem,
@@ -114,7 +115,27 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 const phishing = new PhishingGuard(() => !!svc.settings.phishingWarning);
 
 const outcomes = new LoginOutcomes(local);
-const notifications = new NotificationService(svc, { injectContentScript });
+const notifications = new NotificationService(
+  svc,
+  {
+    injectContentScript,
+    // page state after a login submission: the top frame (frameId 0) and all other frames
+    async probe(tabId) {
+      try {
+        const frames = await collectFrames(tabId);
+        const tab = await chrome.tabs.get(tabId);
+        return {
+          url: tab.url ?? "",
+          topFrame: frames.find((f) => f.frameId === 0)?.result ?? null,
+          frames: frames.filter((f) => f.frameId !== 0 && f.result).map((f) => f.result!),
+        };
+      } catch {
+        return null;
+      }
+    },
+  },
+  outcomes,
+);
 
 // passkeys (must be created synchronously so its onConnect listener exists when the worker wakes up)
 const fido2 = new Fido2Service(svc, {
@@ -757,6 +778,9 @@ const handlers: Record<string, Handler> = {
   async notifyClose(args) {
     await notifications.close(args.token);
     return { ok: true };
+  },
+  async notifyOutcome(args) {
+    return notifications.answer(args.token, args.answer);
   },
   async neverDomains(args) {
     if (args.remove) await removeNeverDomain(args.remove);

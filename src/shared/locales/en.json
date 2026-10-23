@@ -1162,5 +1162,12 @@
  "Unklar – bitte selbst prüfen": "Unclear – please check yourself",
  "Bereinigen": "Clean up",
  "Nur in diesem Eintrag: {fields}": "Only in this item: {fields}",
- "Nutzungsdaten konnten nicht geladen werden": "Usage data could not be loaded"
+ "Nutzungsdaten konnten nicht geladen werden": "Usage data could not be loaded",
+ "Hat die Anmeldung mit „{name}“ geklappt?": "Did the sign-in with “{name}” work?",
+ "Nicht mehr fragen": "Don't ask again",
+ "Anmelde-Ergebnis merken (für den Duplikat-Check)": "Remember sign-in results (for the duplicate check)",
+ "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Remembers on this device whether signing in with a saved login worked – without passwords",
+ "Bei unklaren Einträgen nachfragen": "Ask for unclear items",
+ "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Only when the website has several logins with different passwords",
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Delete saved sign-in results"
 }

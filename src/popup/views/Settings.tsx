@@ -724,6 +724,7 @@ function BlockedDomains() {
 
 function NotificationsSection({ title, show }: SectionProps) {
   const { s, set } = useSettings();
+  const toast = useToast();
   const [showNever, setShowNever] = useState(false);
   return (
     <Group title={title} show={show}>
@@ -744,6 +745,44 @@ function NotificationsSection({ title, show }: SectionProps) {
         desc={t("Wenn du dich mit einem neuen Passwort für einen gespeicherten Login anmeldest")}
       >
         <Switch checked={s.promptUpdate} onChange={(v) => set({ promptUpdate: v })} label={t("Aktualisieren anbieten")} />
+      </Row>
+      <Row
+        title={t("Anmelde-Ergebnis merken (für den Duplikat-Check)")}
+        desc={t("Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter")}
+      >
+        <Switch
+          checked={s.trackLoginOutcome}
+          onChange={(v) => set({ trackLoginOutcome: v })}
+          label={t("Anmelde-Ergebnis merken (für den Duplikat-Check)")}
+        />
+      </Row>
+      <Row
+        title={t("Bei unklaren Einträgen nachfragen")}
+        desc={t("Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt")}
+      >
+        <Switch
+          checked={s.askLoginOutcome}
+          onChange={(v) => set({ askLoginOutcome: v })}
+          disabled={!s.trackLoginOutcome}
+          label={t("Bei unklaren Einträgen nachfragen")}
+        />
+      </Row>
+      <Row title={t("Gespeicherte Anmelde-Ergebnisse löschen")}>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          data-testid="clear-login-outcomes"
+          onClick={async () => {
+            try {
+              await call("clearLoginOutcomes", {});
+              toast.show(t("Gelöscht"));
+            } catch (e: any) {
+              toast.show(e?.message ?? String(e), "error");
+            }
+          }}
+        >
+          {t("Löschen")}
+        </button>
       </Row>
       <Row
         title={t("Ausgeschlossene Websites")}

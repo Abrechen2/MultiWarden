@@ -1,4 +1,4 @@
-// "Login speichern?" bar, rendered in an extension-origin iframe at the top right of the page.
+// "Login speichern?" bar (also "Hat die Anmeldung geklappt?"), rendered in an extension-origin iframe at the top right of the page.
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { NotificationData } from "../shared/messages";
@@ -91,7 +91,14 @@ function Bar() {
   };
 
   const folders = d.folders.filter((f) => f.accountKey === account);
-  const title = d.locked ? t("Login speichern?") : d.kind === "update" ? t("Passwort aktualisieren?") : t("Login speichern?");
+  const title = d.locked
+    ? t("Login speichern?")
+    : d.kind === "update"
+      ? t("Passwort aktualisieren?")
+      : d.kind === "confirmLogin"
+        ? t("Hat die Anmeldung mit „{name}“ geklappt?", { name: d.confirmItem?.name ?? d.host })
+        : t("Login speichern?");
+  const answer = (a: "yes" | "no" | "never", msg: string) => act(() => rpc("notifyOutcome", { token, answer: a }), msg);
 
   return (
     <div ref={root} class="bar" role="dialog" aria-label={title}>
@@ -120,6 +127,32 @@ function Bar() {
                 {t("Entsperren")}
               </button>
             </div>
+          ) : d.kind === "confirmLogin" ? (
+            <>
+              {d.confirmItem && (
+                <div class="muted small target">
+                  <span class="dot" style={{ background: d.confirmItem.accountColor }} />
+                  {d.confirmItem.name} · {d.confirmItem.accountLabel}
+                </div>
+              )}
+              <div class="row">
+                <button
+                  class="btn ghost"
+                  disabled={busy}
+                  onClick={() => answer("never", t("Für diese Website wird nicht mehr gefragt"))}
+                  data-testid="notify-outcome-never"
+                >
+                  {t("Nicht mehr fragen")}
+                </button>
+                <span class="grow" />
+                <button class="btn ghost" disabled={busy} onClick={() => answer("no", t("Gespeichert"))} data-testid="notify-outcome-no">
+                  {t("Nein")}
+                </button>
+                <button class="btn primary" disabled={busy} onClick={() => answer("yes", t("Gespeichert"))} data-testid="notify-outcome-yes">
+                  {t("Ja")}
+                </button>
+              </div>
+            </>
           ) : d.kind === "update" ? (
             <>
               {d.targets.length > 1 && (

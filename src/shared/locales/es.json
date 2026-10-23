@@ -1162,5 +1162,12 @@
  "Unklar – bitte selbst prüfen": "Poco claro: compruébalo tú mismo",
  "Bereinigen": "Limpiar",
  "Nur in diesem Eintrag: {fields}": "Solo en este elemento: {fields}",
- "Nutzungsdaten konnten nicht geladen werden": "No se pudieron cargar los datos de uso"
+ "Nutzungsdaten konnten nicht geladen werden": "No se pudieron cargar los datos de uso",
+ "Hat die Anmeldung mit „{name}“ geklappt?": "¿Funcionó el inicio de sesión con «{name}»?",
+ "Nicht mehr fragen": "No volver a preguntar",
+ "Anmelde-Ergebnis merken (für den Duplikat-Check)": "Recordar el resultado del inicio de sesión (para la comprobación de duplicados)",
+ "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Recuerda en este dispositivo si el inicio de sesión con un login guardado funcionó, sin contraseñas",
+ "Bei unklaren Einträgen nachfragen": "Preguntar en elementos dudosos",
+ "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Solo si el sitio web tiene varios logins con contraseñas distintas",
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Eliminar los resultados de inicio de sesión guardados"
 }
