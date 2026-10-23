@@ -1,4 +1,5 @@
 // Websites where MultiWarden never offers to save logins (and does not handle passkeys).
+import { NEVER_ASK_KEY } from "./login-outcomes";
 import { local } from "./store";
 
 const KEY = "neverDomains";
@@ -25,7 +26,7 @@ export async function isNeverDomain(host: string): Promise<boolean> {
 }
 
 // Websites where MultiWarden never asks whether a login worked (separate from the save list above).
-const ASK_KEY = "neverAskOutcome";
+const ASK_KEY = NEVER_ASK_KEY;
 
 export async function addNeverAskDomain(host: string) {
   const h = host.toLowerCase();

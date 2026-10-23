@@ -40,7 +40,7 @@ interface TrackedAttempt extends Attempt {
   promptToken?: string;
   /** that prompt was shown: it wins over the question */
   prompted?: boolean;
-  /** a failure seen on the SPA timer path was scheduled for a second look */
+  /** a failure or a "settling" page seen on the SPA timer path was scheduled for a second look */
   recheck?: boolean;
   /** the question is shown with this token, about this item */
   token?: string;
@@ -83,7 +83,7 @@ export class NotificationService {
   private observing = new Set<number>();
   /** tabs whose page finished loading while an observation was running: observe again afterwards */
   private rerun = new Set<number>();
-  /** second look at a failure seen on the SPA timer path */
+  /** second look at a failure or a vanished form seen on the SPA timer path */
   private rechecks = new Map<number, ReturnType<typeof setTimeout>>();
 
   constructor(
@@ -309,20 +309,30 @@ export class NotificationService {
         return;
       }
       const state = await this.hooks.probe(tabId).catch(() => null);
-      const outcome = classifyOutcome(a, state, Date.now());
+      const seen = classifyOutcome(a, state, Date.now(), afterNavigation);
       // a newer submission may have replaced the attempt while the page was probed
       const cur = await this.getAttempt(tabId);
       if (cur?.id !== a.id) return;
       // a navigation started meanwhile: the timer may have seen the old page, the load decides
       if (!afterNavigation && cur.navigating) return;
-      if (outcome === "failure" && !afterNavigation && !a.recheck) {
-        // slow single-page logins keep the form for a moment: look once more before recording a failure
+      if ((seen === "failure" || seen === "settling") && !afterNavigation && !a.recheck) {
+        // slow single-page logins keep the form for a moment, others hide it while the login runs:
+        // look once more before recording a failure or a success
         await this.putAttempt({ ...cur, recheck: true });
         clearTimeout(this.rechecks.get(tabId));
         this.rechecks.set(
           tabId,
           setTimeout(() => this.observe(tabId, false).catch(() => {}), SHOW_DELAY),
         );
+        return;
+      }
+      // second look: the form stayed away
+      const outcome = seen === "settling" ? "success" : seen;
+      const pageUrl = (await tabUrl(tabId)) ?? state?.url;
+      // pages blocked for autofill get neither a silent record nor the question
+      const blocked = this.svc.settings.blockedDomains;
+      if ([pageUrl, state?.url, a.url].some((u) => isBlockedUrl(u, blocked))) {
+        await this.dropAttempt(a);
         return;
       }
       if (outcome === "pending") {
@@ -334,7 +344,6 @@ export class NotificationService {
         await this.dropAttempt(a);
         return;
       }
-      const pageUrl = state?.url ?? (await tabUrl(tabId));
       const item = await this.questionFor(a, pageUrl);
       if (!item) {
         await this.dropAttempt(a);
@@ -366,14 +375,16 @@ export class NotificationService {
 
   /**
    * The item to ask about, or undefined. Only asked when the item conflicts with another matching login
-   * (same site + username, different password), at most once per item and password revision, never on a
-   * page blocked for autofill, never when the save/update prompt of the same submission was shown.
+   * (same site + username, different password), at most once per item and password revision, only while
+   * the tab still shows the site of the login (the caller has ruled out pages blocked for autofill), never
+   * when the save/update prompt of the same submission was shown.
    */
   private async questionFor(a: TrackedAttempt, pageUrl: string | undefined): Promise<ItemView | undefined> {
     const s = this.svc.settings;
     // defensive: an attempt needs an exact saved match, so no save/update prompt is due for it today
     if (!s.askLoginOutcome || a.prompted) return undefined;
-    if (isBlockedUrl(pageUrl, s.blockedDomains) || isBlockedUrl(a.url, s.blockedDomains)) return undefined;
+    // asked on another site the question would be out of context (and tell that site about the entry)
+    if (!pageUrl || baseDomain(pageUrl) !== a.site) return undefined;
     if (await isNeverAskDomain(a.host)) return undefined;
     const items = await this.attemptItems(a);
     if (!items.length) return undefined;

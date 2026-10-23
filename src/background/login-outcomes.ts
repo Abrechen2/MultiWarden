@@ -16,6 +16,8 @@ const PREFIX = "loginOutcome:";
 const ASKED = "outcomeAsked:";
 /** account keys that have a record, so that clear() without argument can find them */
 const INDEX = "loginOutcomeAccounts";
+/** hosts where the outcome question is never shown ("Nicht mehr fragen"; list kept in never-domains.ts) */
+export const NEVER_ASK_KEY = "neverAskOutcome";
 
 export function itemRev(i: ItemView): string {
   return i.login?.passwordRevisionDate ?? i.revisionDate ?? "";
@@ -78,7 +80,8 @@ export class LoginOutcomes {
   async clear(accountKey?: string): Promise<void> {
     const idx = (await this.store.get<string[]>(INDEX)) ?? [];
     if (accountKey === undefined) {
-      await this.store.remove([...idx.flatMap((k) => [PREFIX + k, ASKED + k]), INDEX]);
+      // everything learned for this feature, including the hosts the user never wants to be asked about
+      await this.store.remove([...idx.flatMap((k) => [PREFIX + k, ASKED + k]), INDEX, NEVER_ASK_KEY]);
       return;
     }
     await this.store.remove([PREFIX + accountKey, ASKED + accountKey]);

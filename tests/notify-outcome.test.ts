@@ -52,7 +52,13 @@ const frame = (url: string, over: Partial<CollectResult> = {}): CollectResult =>
 const SUCCESS = { url: "https://example.de/home", topFrame: frame("https://example.de/home"), frames: [] };
 const FAILURE = { url: LOGIN_URL, topFrame: frame(LOGIN_URL, { hasPassword: true, hasUsername: true }), frames: [] };
 
+/** the same login page without any login field (SPA after the submit, or a form hidden for a moment) */
+const SAME_PAGE = { url: LOGIN_URL, topFrame: frame(LOGIN_URL), frames: [] };
+
 const updated: ((tabId: number, info: any) => void)[] = [];
+/** URL of tab 1 as chrome.tabs.get reports it; defaults to the probed page */
+let tabUrlOverride: string | undefined;
+(globalThis as any).chrome.tabs.get = async () => ({ id: 1, url: tabUrlOverride ?? probeState?.url ?? LOGIN_URL });
 (globalThis as any).chrome.tabs.onUpdated = { addListener: (f: any) => updated.push(f), removeListener() {} };
 const sent: any[] = [];
 (globalThis as any).chrome.tabs.sendMessage = async (_tab: number, msg: any) => {
@@ -91,6 +97,7 @@ async function reset(over: Record<string, unknown> = {}) {
   resetStorage();
   sent.length = 0;
   probeImpl = null;
+  tabUrlOverride = undefined;
   ITEMS = BASE_ITEMS;
   svc.settings = { ...DEFAULT_SETTINGS, ...over };
 }
@@ -297,13 +304,49 @@ async function run(name: string, fn: () => Promise<void>) {
   });
 
   await run("no question on a page blocked for autofill", async () => {
-    const away = { url: "https://sso.example.org/x", topFrame: frame("https://sso.example.org/x"), frames: [] };
+    // another host of the same site with only a username field: unknown
+    const away = { url: "https://sso.example.de/x", topFrame: frame("https://sso.example.de/x", { hasUsername: true }), frames: [] };
     await reset();
     await submit("alex", "pw-one", away);
-    check("control: unknown on another site asks", (await kinds()).join() === "confirmLogin", sent);
-    await reset({ blockedDomains: ["sso.example.org"] });
+    check("control: unknown on another host of the site asks", (await kinds()).join() === "confirmLogin", sent);
+    await reset({ blockedDomains: ["sso.example.de"] });
     await submit("alex", "pw-one", away);
     check("no question on a page blocked for autofill", notifications().length === 0, sent);
+  });
+
+  await run("no silent recording on a blocked landing page", async () => {
+    const landing = { url: "https://app.example.de/home", topFrame: frame("https://app.example.de/home"), frames: [] };
+    await reset();
+    await submit("alex", "pw-one", landing);
+    check("control: success on another host of the site is recorded", (await recordsOf(A)).A?.ok === true);
+    await reset({ blockedDomains: ["app.example.de"] });
+    await submit("alex", "pw-one", landing);
+    check("blocked landing page: nothing recorded", Object.keys(await recordsOf(A)).length === 0, await recordsOf(A));
+    check("blocked landing page: nothing asked, attempt dropped", notifications().length === 0 && sessionData["attempt:1"] === undefined, sent);
+  });
+
+  await run("question only while the tab is on the attempt's site", async () => {
+    await reset();
+    tabUrlOverride = "https://other.example.org/";
+    await submit("alex", "pw-one", null);
+    check("tab moved to another site: no question", notifications().length === 0, sent);
+    check("tab moved to another site: attempt dropped", sessionData["attempt:1"] === undefined, sessionData["attempt:1"]);
+    await reset();
+    tabUrlOverride = "https://www.example.de/start";
+    await submit("alex", "pw-one", null);
+    check("tab on another host of the same site: asked", (await kinds()).join() === "confirmLogin", sent);
+  });
+
+  await run("clearing outcomes resets the never-ask list", async () => {
+    await reset();
+    await submit("alex", "pw-one", null);
+    await ns.answer(notifications()[0]?.token, "never");
+    check("never-ask list filled", (localData.neverAskOutcome ?? []).includes("example.de"), localData);
+    await outcomes.clear();
+    check("clear removes the never-ask list", localData.neverAskOutcome === undefined, localData.neverAskOutcome);
+    sent.length = 0;
+    await submit("alex", "pw-one", null);
+    check("after clearing: asked again on a never-ask host", (await kinds()).join() === "confirmLogin", sent);
   });
 
   await run("shared organization item", async () => {
@@ -324,6 +367,28 @@ async function run(name: string, fn: () => Promise<void>) {
     await submitSpa("alex", "pw-one");
     await sleep(DELAY);
     check("SPA timer path records success without navigation", (await recordsOf(A)).A?.ok === true);
+  });
+
+  await run("SPA same page without fields is re-checked", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    let calls = 0;
+    probeImpl = async () => (++calls, SAME_PAGE);
+    await submitSpa("alex", "pw-one");
+    await sleep(DELAY);
+    check("SPA same page: no success on the first look", Object.keys(await recordsOf(A)).length === 0 && calls === 1, { r: await recordsOf(A), calls });
+    await sleep(DELAY);
+    const r = await recordsOf(A);
+    check("SPA same page: success recorded after the re-check", r.A?.ok === true && calls === 2, { r, calls });
+  });
+
+  await run("SPA form only hidden for a moment", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    let calls = 0;
+    probeImpl = async () => (++calls === 1 ? SAME_PAGE : FAILURE);
+    await submitSpa("alex", "pw-one");
+    await sleep(2 * DELAY);
+    const r = await recordsOf(A);
+    check("SPA form back on the re-check: no success recorded", r.A?.ok !== true && calls === 2, { r, calls });
   });
 
   await run("SPA failure is re-checked", async () => {
