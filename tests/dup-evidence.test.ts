@@ -1,6 +1,6 @@
 // Evidence and recommendation per duplicate group: outcomes, then history, then password date; cautious removal.
 import "./chrome-stub";
-import { CipherType, ItemView } from "../src/shared/types";
+import { CipherType, ItemView, OutcomeRecord } from "../src/shared/types";
 import { assessGroup, Evidence } from "../src/shared/dup-evidence";
 import { DuplicateGroup } from "../src/shared/duplicates";
 
@@ -127,6 +127,33 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   const c = login("c", { password: "x", creationDate: "2020-01-01T00:00:00Z" });
   const r2 = assessGroup(group([c, oldI], false), none, fn);
   check("password date falls back to creation date", r2.evidence.get(c)?.passwordChanged === "2020-01-01T00:00:00Z" && r2.evidence.get(c)?.passwordChangedIsCreation === true);
+}
+
+{
+  const mk = (id: string, pw: string, extra: Opts = {}) => login(id, { password: pw, ...extra });
+  const rec = (m: Record<string, OutcomeRecord>): Evidence => ({ lastUsed: {}, outcomes: { a: m } });
+  const ok = (at: number): OutcomeRecord => ({ at, ok: true, rev: "x" });
+  const bad = (at: number): OutcomeRecord => ({ at, ok: false, rev: "x" });
+  // S1
+  const a = mk("a1", "pw1"), b = mk("b1", "pw2"), c = mk("c1", "pw3", { history: ["pw1"] });
+  let r = assessGroup(group([a, b, c], false), rec({ a1: ok(1000), b1: bad(2000) }), fn);
+  check("S1 working login is never removable", r.recommended === a && !r.removable.includes(a) && !r.outdated.has(a), r);
+  // S2
+  const d = mk("d1", "pw4", { pwDate: "2026-01-01T00:00:00Z" });
+  r = assessGroup(group([a, b, d], false), rec({ a1: ok(1000), b1: bad(2000) }), fn);
+  check("S2 failure of another variant does not block the winner", r.recommended === a && !r.unclear, r);
+  // S3
+  const b3 = mk("b3", "pw2", { history: ["pw1"] }), c3 = mk("c3", "pw3");
+  r = assessGroup(group([a, b3, c3], false), rec({ b3: bad(2000) }), fn);
+  check("S3 history of a failed variant outdates nothing", !r.outdated.has(a) && !r.removable.includes(a), r);
+  // R6
+  const u = mk("u1", "pw9");
+  r = assessGroup(group([a, u], false), rec({ a1: ok(1000) }), fn);
+  check("R6 unrelated variant stays undecided", r.recommended === a && r.keep.includes(u) && !r.removable.includes(u), r);
+  // success variant pointed at by a third variant's history, no winner (tie)
+  const x = mk("x1", "pw1"), y = mk("y1", "pw5"), z = mk("z1", "pw6", { history: ["pw1"] });
+  r = assessGroup(group([x, y, z], false), rec({ x1: ok(1000), y1: ok(1000) }), fn);
+  check("success variant is not outdated by history", !r.outdated.has(x) && !r.removable.includes(x), r);
 }
 
 console.log(failed ? `${failed} FAILED` : "ALL PASSED");
