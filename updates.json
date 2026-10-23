@@ -1,0 +1,13 @@
+{
+  "addons": {
+    "multiwarden@abrechen2.de": {
+      "updates": [
+        {
+          "version": "1.5.2",
+          "update_link": "https://github.com/Abrechen2/MultiWarden/releases/download/v1.5.2/MultiWarden-1.5.2.xpi",
+          "update_hash": "sha256:e61548425479ce5d2d0dae62e6bd677fe592cf27358a412e21f409f944fc9159"
+        }
+      ]
+    }
+  }
+}
