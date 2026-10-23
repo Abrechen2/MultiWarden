@@ -149,7 +149,8 @@ function ConfirmBox({ o, done }: { o: ConfirmOpts; done: (v: boolean) => void })
   return (
     <>
       <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>{o.title}</h3>
-      <p class="muted" style={{ margin: "0 0 16px", whiteSpace: "pre-line" }}>
+      {/* long lists (bulk clean-up) scroll inside the message, so the buttons stay in the popup */}
+      <p class="muted" style={{ margin: "0 0 16px", whiteSpace: "pre-line", maxHeight: "50vh", overflowY: "auto" }}>
         {o.message}
       </p>
       <div class="row-gap" style={{ justifyContent: "flex-end" }}>

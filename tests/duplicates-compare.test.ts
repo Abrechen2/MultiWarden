@@ -106,6 +106,9 @@ const folderName = (i: ItemView) => (i.folderId === "f1" ? "Privat" : i.folderId
   check("shared org item seen by two accounts is one item", findDuplicates([acc("x", "a", shared), acc("x", "b", shared)]).length === 0);
   const g3 = findDuplicates([acc("x", "a", shared), acc("x", "b", shared), acc("y", "a")]);
   check("shared pair plus personal copy is one group of 2", g3.length === 1 && g3[0].items.length === 2, g3);
+  check("same id in two organizations is two items", findDuplicates([acc("x", "a", { organizationId: "o1" }), acc("x", "b", { organizationId: "o2" })]).length === 1);
+  check("same id without organization is two items", findDuplicates([acc("x", "a"), acc("x", "b")]).length === 1);
+  check("shared item listed once, under the first account", findDuplicates([acc("x", "b", shared), acc("x", "a", shared), acc("y", "a")])[0]?.items.some((i) => i.id === "x" && i.accountKey === "b"));
 
   console.log(failed ? `${failed} FAILED` : "ALL PASSED");
   process.exit(failed ? 1 : 0);

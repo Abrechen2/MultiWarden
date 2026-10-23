@@ -194,9 +194,17 @@ export function sameSharedItem(a: ItemView, b: ItemView): boolean {
  * Items may come from several accounts; a shared item seen by two accounts counts once.
  */
 export function findDuplicates(items: ItemView[], mode: DuplicateMode = "site"): DuplicateGroup[] {
+  // a shared item seen by several accounts: keep the first copy (same test as sameSharedItem, in one pass)
+  const seenShared = new Set<string>();
   const live = items
     .filter((i) => !i.deletedDate && !i.decryptError)
-    .filter((i, idx, all) => !all.slice(0, idx).some((e) => sameSharedItem(e, i)));
+    .filter((i) => {
+      if (!i.organizationId || !i.id) return true;
+      const k = i.organizationId + "\u0000" + i.id;
+      if (seenShared.has(k)) return false;
+      seenShared.add(k);
+      return true;
+    });
   const parent = live.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   const firstByKey = new Map<string, number>();
