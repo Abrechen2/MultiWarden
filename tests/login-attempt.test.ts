@@ -49,6 +49,20 @@ check("new-password field after navigating -> unknown",
 check("expired attempt -> unknown", classifyOutcome(attempt(), state(frame("https://example.de/home")), 1_000 + ATTEMPT_TTL + 1) === "unknown");
 check("attempt at the TTL boundary still counts", classifyOutcome(attempt(), state(frame("https://example.de/home")), 1_000 + ATTEMPT_TTL) === "success");
 check("unparsable attempt url -> unknown", classifyOutcome(attempt({ url: "not a url" }), state(frame("https://example.de/home")), NOW) === "unknown");
+check("redirect to /login?error=1 with only a username field -> unknown",
+  classifyOutcome(attempt(), state(frame("https://example.de/login?error=1", { hasUsername: true })), NOW) === "unknown");
+check("sawTotp, then a username-only page -> unknown",
+  classifyOutcome(attempt({ sawTotp: true }), state(frame("https://example.de/login", { hasUsername: true })), NOW) === "unknown");
+check("top frame password with an empty frames list -> failure",
+  classifyOutcome(attempt(), { url: LOGIN, topFrame: frame(LOGIN, { hasPassword: true }), frames: [] }, NOW) === "failure");
+check("top frame totp with an empty frames list -> pending",
+  classifyOutcome(attempt(), { url: LOGIN, topFrame: frame(LOGIN, { hasTotp: true }), frames: [] }, NOW) === "pending");
+check("opaque-origin frame with a password field -> unknown",
+  classifyOutcome(attempt(), state(frame("https://example.de/home"), [{ ...frame("https://example.de/f", { hasPassword: true }), origin: "null" }]), NOW) === "unknown");
+check("NaN now -> unknown", classifyOutcome(attempt(), state(frame("https://example.de/home")), NaN) === "unknown");
+check("NaN attempt time -> unknown", classifyOutcome(attempt({ at: NaN }), state(frame("https://example.de/home")), NOW) === "unknown");
+check("top frame url on another site than state url -> unknown",
+  classifyOutcome(attempt(), { url: "https://example.de/home", topFrame: frame("https://evil.example.net/"), frames: [] }, NOW) === "unknown");
 
 console.log(failed ? `${failed} FAILED` : "ALL PASSED");
 process.exit(failed ? 1 : 0);
