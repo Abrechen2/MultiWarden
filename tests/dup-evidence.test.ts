@@ -10,7 +10,7 @@ const check = (n: string, ok: boolean, info: any = "") => {
   if (!ok) failed++;
 };
 
-type Opts = Partial<ItemView> & { password?: string; totp?: string; pwDate?: string; history?: string[] };
+type Opts = Partial<ItemView> & { password?: string; totp?: string; pwDate?: string; history?: string[]; historyDate?: string };
 const login = (id: string, o: Opts = {}): ItemView => ({
   id,
   accountKey: o.accountKey ?? "a",
@@ -24,7 +24,7 @@ const login = (id: string, o: Opts = {}): ItemView => ({
   folderId: null,
   login: { username: "alex", password: o.password, totp: o.totp, uris: [{ uri: "https://example.de" }], passkeys: 0, passwordRevisionDate: o.pwDate },
   fields: [],
-  passwordHistory: (o.history ?? []).map((password) => ({ password, lastUsedDate: "2025-01-01T00:00:00Z" })),
+  passwordHistory: (o.history ?? []).map((password) => ({ password, lastUsedDate: o.historyDate ?? "2025-01-01T00:00:00Z" })),
   attachments: [],
   revisionDate: o.revisionDate,
   creationDate: o.creationDate,
@@ -213,6 +213,29 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   const v4 = login("V", { password: "P_v", pwDate: "2025-12-01T00:00:00Z" });
   r = assessGroup(group([w, v4], false), { lastUsed: {}, outcomes: { a: { W: okW, V: { at: T + 1000, ok: false, rev: "x" } } } }, fn);
   check("R19 winner history does not make a failure newer than every success removable", r.outdated.has(v4) && !r.removable.includes(v4), r);
+}
+
+{
+  // history evidence is dated by the entry that holds it, never by another member of its variant
+  const u1 = login("U1", { password: "P_u", pwDate: "2024-01-01T00:00:00Z", history: ["P_v"], historyDate: "2024-01-01T00:00:00Z" });
+  const v = login("V", { password: "P_v", pwDate: "2025-05-01T00:00:00Z" });
+  let r = assessGroup(group([u1, v], false), none, fn);
+  check("history older than the password: not outdated", !r.outdated.has(v) && !r.removable.includes(v), r);
+  // a later plain copy of P_u (created 2026-06, no revision date) holds no history
+  const u2 = login("U2", { password: "P_u", creationDate: "2026-06-01T00:00:00Z" });
+  r = assessGroup(group([u1, u2, v], false), none, fn);
+  check("later copy without history does not date the history: not outdated, not removable", !r.outdated.has(v) && !r.removable.includes(v), r);
+  const u3 = login("U3", { password: "P_u", pwDate: "2026-06-01T00:00:00Z" });
+  r = assessGroup(group([u1, u3, v], false), none, fn);
+  check("later revised copy without history does not date the history: not outdated, not removable", !r.outdated.has(v) && !r.removable.includes(v), r);
+  // control: the history entry replaced P_v after V's password date -> outdated as before
+  const u4 = login("U4", { password: "P_u", pwDate: "2026-01-01T00:00:00Z", history: ["P_v"], historyDate: "2026-01-01T00:00:00Z" });
+  r = assessGroup(group([u4, v], false), none, fn);
+  check("control: history entry newer than the password still outdates", r.outdated.has(v) && r.removable.includes(v) && r.recommended === u4, r);
+  // a history entry without a usable date falls back to its own member's password date, not another member's
+  const u5 = { ...login("U5", { password: "P_u", pwDate: "2024-01-01T00:00:00Z" }), passwordHistory: [{ password: "P_v", lastUsedDate: "" }] } as ItemView;
+  r = assessGroup(group([u5, u3, v], false), none, fn);
+  check("undated history entry falls back to its own member's date", !r.outdated.has(v) && !r.removable.includes(v), r);
 }
 
 console.log(failed ? `${failed} FAILED` : "ALL PASSED");
