@@ -2,6 +2,7 @@ import type { SerializedKey } from "../crypto/bw";
 import type { AccountPublic, ItemView, ServerType, ServerUrls, Settings, VaultData } from "./types";
 import type { ForwarderId, ForwarderSettings } from "./forwarders";
 import type { ReceiveAuth, ReceiveRequest, ReceiveResult, SendEdit, SendListResponse, SendView } from "./sends";
+import type { OutcomeRecord } from "../background/login-outcomes";
 
 export interface StateResponse {
   accounts: AccountPublic[];
@@ -320,6 +321,12 @@ export interface Rpc {
   fido2Fallback: { req: { token: string }; res: { ok: true } };
   fido2Cancel: { req: { token: string }; res: { ok: true } };
   fido2Ping: { req: { token: string }; res: { ok: boolean } };
+  // cleanup assistant: evidence for duplicate decisions
+  usageEvidence: {
+    req: Record<string, never>;
+    res: { lastUsed: Record<string, Record<string, number>>; outcomes: Record<string, Record<string, OutcomeRecord>> };
+  };
+  clearLoginOutcomes: { req: Record<string, never>; res: { ok: true } };
   // save-login notification
   notifyCapture: { req: LoginCapture; res: { ok: true } };
   notifyData: { req: { token: string }; res: NotificationData };

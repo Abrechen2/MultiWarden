@@ -25,9 +25,10 @@ import { createAlias } from "./forwarders";
 import { SecretStore } from "./secret-store";
 import { Menus } from "./menus";
 import { NotificationService } from "./notify";
+import { LoginOutcomes, type OutcomeRecord } from "./login-outcomes";
 import { Fido2Service } from "./fido2";
 import { neverDomains, removeNeverDomain } from "./never-domains";
-import { restrictSessionAccess } from "./store";
+import { local, restrictSessionAccess } from "./store";
 import { LoginFlows } from "./login-flow";
 import { customEnvFor, setCustomEnv, urlsFor, VaultService } from "./vault-service";
 import { receiveSend, receiveSendFile } from "./send-receive";
@@ -112,6 +113,7 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 // phishing warning: known phishing links (Bitwarden's list) open a warning page instead
 const phishing = new PhishingGuard(() => !!svc.settings.phishingWarning);
 
+const outcomes = new LoginOutcomes(local);
 const notifications = new NotificationService(svc, { injectContentScript });
 
 // passkeys (must be created synchronously so its onConnect listener exists when the worker wakes up)
@@ -712,6 +714,23 @@ const handlers: Record<string, Handler> = {
   },
   async fido2Ping(args) {
     return { ok: fido2.ping(args.token) };
+  },
+  // --- cleanup assistant ---
+  async usageEvidence() {
+    const lastUsed = svc.lastUsedByAccount();
+    const items = (await svc.getVault()).items;
+    const result: Record<string, Record<string, OutcomeRecord>> = {};
+    for (const accountKey of Object.keys(lastUsed)) {
+      result[accountKey] = await outcomes.forAccount(
+        accountKey,
+        items.filter((i) => i.accountKey === accountKey),
+      );
+    }
+    return { lastUsed, outcomes: result };
+  },
+  async clearLoginOutcomes() {
+    await outcomes.clear();
+    return { ok: true };
   },
   // --- save-login notification ---
   async notifyCapture(args, sender) {

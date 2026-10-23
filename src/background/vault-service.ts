@@ -1066,6 +1066,7 @@ export class VaultService {
     await local.remove([
       "sync:" + key,
       "lastUsed:" + key,
+      "loginOutcome:" + key,
       "pinEnv:" + key,
       "encPin:" + key,
       "deviceKey:" + key,
@@ -1304,6 +1305,13 @@ export class VaultService {
         b.quality - a.quality || this.lastUsedAt(b.item) - this.lastUsedAt(a.item) || a.item.name.localeCompare(b.item.name, "de"),
     );
     return result.map((r) => r.item);
+  }
+
+  /** Per-device last-used times of the unlocked accounts (copy). */
+  lastUsedByAccount(): Record<string, Record<string, number>> {
+    const out: Record<string, Record<string, number>> = {};
+    for (const acc of this.sortedAccounts) if (this.unlocked.has(acc.key)) out[acc.key] = { ...(this.lastUsed.get(acc.key) ?? {}) };
+    return out;
   }
 
   lastUsedAt(i: { accountKey: string; id: string }): number {

@@ -224,6 +224,10 @@ export interface Settings {
   theme: "system" | "light" | "dark";
   /** offer to save new logins / update changed passwords after a form submission */
   promptSave: boolean;
+  /** remember per login whether the last sign-in worked (local, no password stored) */
+  trackLoginOutcome: boolean;
+  /** ask in the page whether the sign-in worked after a fill */
+  askLoginOutcome: boolean;
   promptUpdate: boolean;
   /** handle WebAuthn requests of websites with passkeys from the vaults */
   passkeys: boolean;
@@ -290,6 +294,8 @@ export const DEFAULT_SETTINGS: Settings = {
   clearClipboardSeconds: 0,
   theme: "system",
   promptSave: true,
+  trackLoginOutcome: true,
+  askLoginOutcome: true,
   promptUpdate: true,
   passkeys: true,
   pinEnabled: false,
