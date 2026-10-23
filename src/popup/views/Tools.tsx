@@ -11,13 +11,14 @@ import { Icon } from "../icons";
 import { call } from "../rpc";
 import { formatDate, itemKey, TYPE_LABEL } from "../util";
 import { DupCompareSummary, DupEvidenceLine, DupItemDiffs, fieldLabel } from "./dup-compare";
+import { CleanupTool } from "./Cleanup";
 import { SendTool } from "./Send";
 import { PasswordReportTool } from "./PasswordReport";
 import { isSendLink, SendReceiveTool } from "./SendReceive";
 import { ALL_ACCOUNTS, AccountSelect, useToolAccount } from "./tool-account";
 
-type Tab = "duplicates" | "report" | "send" | "receive";
-const TABS: Tab[] = ["duplicates", "report", "send", "receive"];
+type Tab = "duplicates" | "cleanup" | "report" | "send" | "receive";
+const TABS: Tab[] = ["duplicates", "cleanup", "report", "send", "receive"];
 const TAB_KEY = "mwToolsTab";
 
 function loadTab(): Tab {
@@ -51,6 +52,7 @@ export function ToolsView() {
           {(
             [
               ["duplicates", t("Duplikate")],
+              ["cleanup", t("Aufräumen")],
               ["report", t("Bericht")],
               ["send", t("Send")],
               ["receive", t("Empfangen")],
@@ -70,6 +72,8 @@ export function ToolsView() {
         </div>
         {tab === "duplicates" ? (
           <DuplicatesTool />
+        ) : tab === "cleanup" ? (
+          <CleanupTool />
         ) : tab === "report" ? (
           <PasswordReportTool />
         ) : tab === "send" ? (

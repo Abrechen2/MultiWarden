@@ -1169,5 +1169,17 @@
  "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Remembers on this device whether signing in with a saved login worked – without passwords",
  "Bei unklaren Einträgen nachfragen": "Ask for unclear items",
  "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Only when the website has several logins with different passwords",
- "Gespeicherte Anmelde-Ergebnisse löschen": "Delete saved sign-in results"
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Delete saved sign-in results",
+ "Aufräumen": "Clean up",
+ "Zeigt Logins, die aufgeräumt werden könnten. Es wird nichts verändert; die Auswertung läuft auf deinem Gerät.": "Shows logins that could be cleaned up. Nothing is changed; the analysis runs on your device.",
+ "Ohne gültige Website": "Without a valid website",
+ "Logins ohne Website, mit einer nicht lesbaren Adresse oder einem Schema, das weder Web noch App ist. Sie werden nie automatisch angeboten.": "Logins without a website, with an unreadable address or with a scheme that is neither web nor app. They are never offered automatically.",
+ "IP-Adressen ohne Port": "IP addresses without a port",
+ "Gilt nur für Port 80/443. Läuft der Dienst auf einem anderen Port, die Adresse ergänzen.": "Only applies to port 80/443. If the service runs on another port, add it to the address.",
+ "Auf diesem Gerät lange nicht genutzt": "Not used on this device for a long time",
+ "Nicht innerhalb der letzten 12 Monate auf diesem Gerät ausgefüllt. Nur eine Information: Auf anderen Geräten können sie in Gebrauch sein.": "Not filled on this device within the last 12 months. For information only: they may be in use on other devices.",
+ "Auf diesem Gerät nie genutzt": "Never used on this device",
+ "Auf diesem Gerät seit {date} nicht genutzt": "Not used on this device since {date}",
+ "In mehreren Konten gleiches Passwort": "Same password in several accounts",
+ "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "The same password in different accounts. The comparison happens in memory only."
 }

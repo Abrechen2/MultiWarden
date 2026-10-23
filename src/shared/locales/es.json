@@ -1169,5 +1169,17 @@
  "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Recuerda en este dispositivo si el inicio de sesión con un login guardado funcionó, sin contraseñas",
  "Bei unklaren Einträgen nachfragen": "Preguntar en elementos dudosos",
  "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Solo si el sitio web tiene varios logins con contraseñas distintas",
- "Gespeicherte Anmelde-Ergebnisse löschen": "Eliminar los resultados de inicio de sesión guardados"
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Eliminar los resultados de inicio de sesión guardados",
+ "Aufräumen": "Limpiar",
+ "Zeigt Logins, die aufgeräumt werden könnten. Es wird nichts verändert; die Auswertung läuft auf deinem Gerät.": "Muestra inicios de sesión que se podrían limpiar. No se cambia nada; el análisis se ejecuta en tu dispositivo.",
+ "Ohne gültige Website": "Sin sitio web válido",
+ "Logins ohne Website, mit einer nicht lesbaren Adresse oder einem Schema, das weder Web noch App ist. Sie werden nie automatisch angeboten.": "Inicios de sesión sin sitio web, con una dirección ilegible o con un esquema que no es ni web ni app. Nunca se ofrecen automáticamente.",
+ "IP-Adressen ohne Port": "Direcciones IP sin puerto",
+ "Gilt nur für Port 80/443. Läuft der Dienst auf einem anderen Port, die Adresse ergänzen.": "Solo vale para el puerto 80/443. Si el servicio usa otro puerto, añádelo a la dirección.",
+ "Auf diesem Gerät lange nicht genutzt": "Sin usar en este dispositivo desde hace tiempo",
+ "Nicht innerhalb der letzten 12 Monate auf diesem Gerät ausgefüllt. Nur eine Information: Auf anderen Geräten können sie in Gebrauch sein.": "No se han rellenado en este dispositivo en los últimos 12 meses. Solo informativo: pueden estar en uso en otros dispositivos.",
+ "Auf diesem Gerät nie genutzt": "Nunca usado en este dispositivo",
+ "Auf diesem Gerät seit {date} nicht genutzt": "Sin usar en este dispositivo desde el {date}",
+ "In mehreren Konten gleiches Passwort": "Misma contraseña en varias cuentas",
+ "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "La misma contraseña en cuentas distintas. La comparación se hace solo en memoria."
 }

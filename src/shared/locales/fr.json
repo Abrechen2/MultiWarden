@@ -1169,5 +1169,17 @@
  "Merkt sich auf diesem Gerät, ob die Anmeldung mit einem gespeicherten Login geklappt hat – ohne Passwörter": "Mémorise sur cet appareil si la connexion avec un identifiant enregistré a fonctionné – sans mots de passe",
  "Bei unklaren Einträgen nachfragen": "Demander pour les éléments incertains",
  "Nur wenn es für die Website mehrere Logins mit unterschiedlichen Passwörtern gibt": "Uniquement si le site web a plusieurs identifiants avec des mots de passe différents",
- "Gespeicherte Anmelde-Ergebnisse löschen": "Supprimer les résultats de connexion enregistrés"
+ "Gespeicherte Anmelde-Ergebnisse löschen": "Supprimer les résultats de connexion enregistrés",
+ "Aufräumen": "Nettoyer",
+ "Zeigt Logins, die aufgeräumt werden könnten. Es wird nichts verändert; die Auswertung läuft auf deinem Gerät.": "Affiche les identifiants qui pourraient être nettoyés. Rien n'est modifié ; l'analyse s'exécute sur votre appareil.",
+ "Ohne gültige Website": "Sans site web valide",
+ "Logins ohne Website, mit einer nicht lesbaren Adresse oder einem Schema, das weder Web noch App ist. Sie werden nie automatisch angeboten.": "Identifiants sans site web, avec une adresse illisible ou un schéma qui n'est ni web ni application. Ils ne sont jamais proposés automatiquement.",
+ "IP-Adressen ohne Port": "Adresses IP sans port",
+ "Gilt nur für Port 80/443. Läuft der Dienst auf einem anderen Port, die Adresse ergänzen.": "Ne vaut que pour le port 80/443. Si le service utilise un autre port, ajoutez-le à l'adresse.",
+ "Auf diesem Gerät lange nicht genutzt": "Inutilisé sur cet appareil depuis longtemps",
+ "Nicht innerhalb der letzten 12 Monate auf diesem Gerät ausgefüllt. Nur eine Information: Auf anderen Geräten können sie in Gebrauch sein.": "Non remplis sur cet appareil au cours des 12 derniers mois. À titre d'information : ils peuvent être utilisés sur d'autres appareils.",
+ "Auf diesem Gerät nie genutzt": "Jamais utilisé sur cet appareil",
+ "Auf diesem Gerät seit {date} nicht genutzt": "Inutilisé sur cet appareil depuis le {date}",
+ "In mehreren Konten gleiches Passwort": "Même mot de passe dans plusieurs comptes",
+ "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "Le même mot de passe dans différents comptes. La comparaison se fait uniquement en mémoire."
 }
