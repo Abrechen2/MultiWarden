@@ -2,9 +2,9 @@
 // the real content script (tests/content-harness.ts) runs in a test page in Chromium with a chrome.* stub,
 // so layout, hit testing and trusted input events are real. No extension or vault server needed.
 // Run: CHROMIUM_PATH=… tests/run-node.sh tests/content-dom.test.ts
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { buildSync } from "esbuild";
 import { chromium, Page } from "playwright-core";
 import { TMP, chromiumOptions } from "./env.mjs";
 
@@ -15,23 +15,17 @@ const check = (n: string, ok: boolean, info: any = "") => {
 };
 
 const ORIGIN = "http://mw.test";
-// bundled through the esbuild CLI (run-node.sh bundles this file, and esbuild itself cannot be bundled)
+// bundled with esbuild's API (run-node.sh keeps esbuild external – it cannot be bundled itself)
 const harnessOut = path.join(TMP, "content-harness.js");
-execFileSync(
-  process.execPath,
-  [
-    path.resolve("node_modules/esbuild/bin/esbuild"),
-    path.resolve("tests/content-harness.ts"),
-    "--bundle",
-    "--format=iife",
-    "--global-name=MWH",
-    "--define:__TEST__=false",
-    "--define:__FIREFOX__=false",
-    "--log-level=warning",
-    "--outfile=" + harnessOut,
-  ],
-  { stdio: "inherit" },
-);
+buildSync({
+  entryPoints: [path.resolve("tests/content-harness.ts")],
+  bundle: true,
+  format: "iife",
+  globalName: "MWH",
+  define: { __TEST__: "false", __FIREFOX__: "false" },
+  logLevel: "warning",
+  outfile: harnessOut,
+});
 // window.chrome cannot be replaced in a page, so the bundle sees the stub as a function parameter
 const bundle = `(function (chrome) {
 ${readFileSync(harnessOut, "utf8")}
@@ -56,23 +50,17 @@ window.__chromeStub = {
 
 // the real inline menu page (src/inline-menu), with a chrome.* stub that serves two entries and records fills
 const menuOut = path.join(TMP, "inline-menu-harness.js");
-execFileSync(
-  process.execPath,
-  [
-    path.resolve("node_modules/esbuild/bin/esbuild"),
-    path.resolve("src/inline-menu/index.tsx"),
-    "--bundle",
-    "--format=iife",
-    "--jsx=automatic",
-    "--jsx-import-source=preact",
-    "--loader:.css=empty",
-    "--define:__TEST__=false",
-    "--define:__FIREFOX__=false",
-    "--log-level=warning",
-    "--outfile=" + menuOut,
-  ],
-  { stdio: "inherit" },
-);
+buildSync({
+  entryPoints: [path.resolve("src/inline-menu/index.tsx")],
+  bundle: true,
+  format: "iife",
+  jsx: "automatic",
+  jsxImportSource: "preact",
+  loader: { ".css": "empty" },
+  define: { __TEST__: "false", __FIREFOX__: "false" },
+  logLevel: "warning",
+  outfile: menuOut,
+});
 const REAL_MENU_PAGE = `<!doctype html><html><body style="margin:0;background:#fff"><div id="root"></div><script>
 window.__fills = [];
 const ev = { addListener() {}, removeListener() {} };
