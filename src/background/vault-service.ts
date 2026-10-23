@@ -1067,6 +1067,7 @@ export class VaultService {
       "sync:" + key,
       "lastUsed:" + key,
       "loginOutcome:" + key,
+      "outcomeAsked:" + key,
       "pinEnv:" + key,
       "encPin:" + key,
       "deviceKey:" + key,

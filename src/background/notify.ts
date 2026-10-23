@@ -1,10 +1,10 @@
 // "Login speichern?" / "Passwort aktualisieren?": captured form submissions → notification bar.
 // Also observes whether a submitted login that equals a stored item worked (login outcome tracking) and,
 // only for entries that conflict with another one, asks "Hat die Anmeldung geklappt?".
-import { findDuplicates } from "../shared/duplicates";
+import { findDuplicates, sameSharedItem } from "../shared/duplicates";
 import { newLoginItem } from "../shared/items";
 import type { LoginCapture, NotificationData } from "../shared/messages";
-import { baseDomain } from "../shared/uri";
+import { baseDomain, isBlockedUrl } from "../shared/uri";
 import { CipherType, ItemView } from "../shared/types";
 import { ATTEMPT_TTL, classifyOutcome, type Attempt, type PageState } from "./login-attempt";
 import { itemRev, LoginOutcomes } from "./login-outcomes";
@@ -40,6 +40,8 @@ interface TrackedAttempt extends Attempt {
   promptToken?: string;
   /** that prompt was shown: it wins over the question */
   prompted?: boolean;
+  /** a failure seen on the SPA timer path was scheduled for a second look */
+  recheck?: boolean;
   /** the question is shown with this token, about this item */
   token?: string;
   askedAt?: number;
@@ -63,6 +65,14 @@ function hostOf(url: string): string {
   }
 }
 
+async function tabUrl(tabId: number): Promise<string | undefined> {
+  try {
+    return (await chrome.tabs.get(tabId)).url;
+  } catch {
+    return undefined;
+  }
+}
+
 function itemName(host: string) {
   return host.replace(/^www\./, "");
 }
@@ -71,6 +81,10 @@ export class NotificationService {
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
   /** tabs whose attempt is being observed right now (load event and timer may overlap) */
   private observing = new Set<number>();
+  /** tabs whose page finished loading while an observation was running: observe again afterwards */
+  private rerun = new Set<number>();
+  /** second look at a failure seen on the SPA timer path */
+  private rechecks = new Map<number, ReturnType<typeof setTimeout>>();
 
   constructor(
     private svc: VaultService,
@@ -82,6 +96,7 @@ export class NotificationService {
       if (info.status === "complete") this.settled(tabId, true).catch(() => {});
     });
     chrome.tabs.onRemoved.addListener(async (tabId) => {
+      clearTimeout(this.rechecks.get(tabId));
       const p = await session.get<Pending>("notify:" + tabId).catch(() => undefined);
       if (p) await this.drop(p).catch(() => {});
       const a = await session.get<TrackedAttempt>("attempt:" + tabId).catch(() => undefined);
@@ -204,6 +219,7 @@ export class NotificationService {
   /** SPA logins don't navigate: act after a moment unless a navigation started */
   private arm(tabId: number) {
     clearTimeout(this.timers.get(tabId));
+    clearTimeout(this.rechecks.get(tabId));
     this.timers.set(
       tabId,
       setTimeout(() => this.settled(tabId, false).catch(() => {}), SHOW_DELAY),
@@ -277,8 +293,13 @@ export class NotificationService {
   // login outcome
 
   private async observe(tabId: number, afterNavigation: boolean) {
-    if (this.observing.has(tabId)) return;
+    if (this.observing.has(tabId)) {
+      // a completed load must not be lost: it decides once the running observation is done
+      if (afterNavigation) this.rerun.add(tabId);
+      return;
+    }
     this.observing.add(tabId);
+    if (afterNavigation) clearTimeout(this.rechecks.get(tabId));
     try {
       const a = await this.getAttempt(tabId);
       if (!a || a.token) return;
@@ -290,7 +311,20 @@ export class NotificationService {
       const state = await this.hooks.probe(tabId).catch(() => null);
       const outcome = classifyOutcome(a, state, Date.now());
       // a newer submission may have replaced the attempt while the page was probed
-      if ((await this.getAttempt(tabId))?.id !== a.id) return;
+      const cur = await this.getAttempt(tabId);
+      if (cur?.id !== a.id) return;
+      // a navigation started meanwhile: the timer may have seen the old page, the load decides
+      if (!afterNavigation && cur.navigating) return;
+      if (outcome === "failure" && !afterNavigation && !a.recheck) {
+        // slow single-page logins keep the form for a moment: look once more before recording a failure
+        await this.putAttempt({ ...cur, recheck: true });
+        clearTimeout(this.rechecks.get(tabId));
+        this.rechecks.set(
+          tabId,
+          setTimeout(() => this.observe(tabId, false).catch(() => {}), SHOW_DELAY),
+        );
+        return;
+      }
       if (outcome === "pending") {
         await this.putAttempt({ ...a, sawTotp: true, navigating: false });
         return;
@@ -300,16 +334,19 @@ export class NotificationService {
         await this.dropAttempt(a);
         return;
       }
-      const item = await this.questionFor(a);
+      const pageUrl = state?.url ?? (await tabUrl(tabId));
+      const item = await this.questionFor(a, pageUrl);
       if (!item) {
         await this.dropAttempt(a);
         return;
       }
       const token = crypto.randomUUID();
+      await this.outcomes.markAsked(item);
       await this.putAttempt({ ...a, token, askedAt: Date.now(), asked: { accountKey: item.accountKey, itemId: item.id } });
       await this.showBar(tabId, token);
     } finally {
       this.observing.delete(tabId);
+      if (this.rerun.delete(tabId)) await this.observe(tabId, true);
     }
   }
 
@@ -329,21 +366,25 @@ export class NotificationService {
 
   /**
    * The item to ask about, or undefined. Only asked when the item conflicts with another matching login
-   * (same site + username, different password), at most once per item and password revision, never when
-   * the save/update prompt of the same submission was shown.
+   * (same site + username, different password), at most once per item and password revision, never on a
+   * page blocked for autofill, never when the save/update prompt of the same submission was shown.
    */
-  private async questionFor(a: TrackedAttempt): Promise<ItemView | undefined> {
-    if (!this.svc.settings.askLoginOutcome || a.prompted) return undefined;
+  private async questionFor(a: TrackedAttempt, pageUrl: string | undefined): Promise<ItemView | undefined> {
+    const s = this.svc.settings;
+    // defensive: an attempt needs an exact saved match, so no save/update prompt is due for it today
+    if (!s.askLoginOutcome || a.prompted) return undefined;
+    if (isBlockedUrl(pageUrl, s.blockedDomains) || isBlockedUrl(a.url, s.blockedDomains)) return undefined;
     if (await isNeverAskDomain(a.host)) return undefined;
     const items = await this.attemptItems(a);
     if (!items.length) return undefined;
     const groups = findDuplicates(await this.matching(a.url), "site");
-    const same = (x: ItemView, y: ItemView) => x.accountKey === y.accountKey && x.id === y.id;
+    // a shared organization item counts once in findDuplicates: its group may hold the other account's copy
+    const same = (x: ItemView, y: ItemView) => (x.accountKey === y.accountKey && x.id === y.id) || sameSharedItem(x, y);
     for (const item of items) {
       const group = groups.find((g) => g.items.some((i) => same(i, item)));
       if (group?.samePassword !== false) continue;
       const known = await this.outcomes.forAccount(item.accountKey, [item]);
-      if (!known[item.id]) return item;
+      if (!known[item.id] && !(await this.outcomes.wasAsked(item))) return item;
     }
     return undefined;
   }

@@ -33,7 +33,8 @@ const login = (accountKey: string, id: string, username: string, password: strin
 const A = login("a1", "A", "alex", "pw-one");
 const B = login("a2", "B", "alex", "pw-two");
 const C = login("a1", "C", "bob", "pw-bob");
-const ITEMS = [A, B, C];
+const BASE_ITEMS = [A, B, C];
+let ITEMS = BASE_ITEMS;
 
 const frame = (url: string, over: Partial<CollectResult> = {}): CollectResult => ({
   url,
@@ -72,19 +73,31 @@ svc.publicAccounts = () => [
 ];
 
 let probeState: any = null;
+/** replaces the probe for one test (reset() restores the default) */
+let probeImpl: (() => Promise<any>) | null = null;
 const outcomes = new LoginOutcomes(local);
 const ns: any = new (NotificationService as any)(
   svc,
-  { injectContentScript: async () => {}, probe: async () => probeState },
+  { injectContentScript: async () => {}, probe: async () => (probeImpl ? probeImpl() : probeState) },
   outcomes,
 );
 
 const settle = () => new Promise((r) => setTimeout(r, 30));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** a bit more than SHOW_DELAY (2.5 s) of notify.ts */
+const DELAY = 2700;
 
 async function reset(over: Record<string, unknown> = {}) {
   resetStorage();
   sent.length = 0;
+  probeImpl = null;
+  ITEMS = BASE_ITEMS;
   svc.settings = { ...DEFAULT_SETTINGS, ...over };
+}
+
+/** submit without any navigation: only the SPA timer observes */
+async function submitSpa(username: string, password: string) {
+  await ns.capture({ url: LOGIN_URL, username, password }, { tab: { id: 1 }, url: LOGIN_URL, frameId: 0 });
 }
 
 /** submit a login form on tab 1, then let the page navigate and finish loading */
@@ -226,11 +239,13 @@ async function run(name: string, fn: () => Promise<void>) {
     check("never-domain: nothing asked", notifications().length === 0, sent);
   });
 
-  await run("save prompt due wins over the question", async () => {
+  // an attempt needs an exact saved match, so no save/update prompt is ever due for it (the guard in
+  // notify.ts is defensive); this checks the reachable case: an unsaved password gets the prompt only
+  await run("unsaved password: update prompt, no question", async () => {
     await reset();
     await submit("alex", "pw-three", null);
     const k = await kinds();
-    check("save prompt due wins over the question", k.length === 1 && (k[0] === "update" || k[0] === "save"), k);
+    check("unsaved password: update prompt, no question", k.length === 1 && (k[0] === "update" || k[0] === "save"), k);
     check("unsaved password: nothing recorded", Object.keys(await recordsOf(A)).length === 0 && Object.keys(await recordsOf(B)).length === 0);
   });
 
@@ -253,6 +268,101 @@ async function run(name: string, fn: () => Promise<void>) {
     await reset({ askLoginOutcome: false });
     await submit("alex", "pw-one", null);
     check("askLoginOutcome off: nothing asked", notifications().length === 0, sent);
+  });
+
+  await run("closed question is not asked again", async () => {
+    await reset();
+    await submit("alex", "pw-one", null);
+    const tok = notifications()[0]?.token;
+    check("closed question: first asked", !!tok);
+    await ns.close(tok);
+    check("closed question: nothing recorded", Object.keys(await recordsOf(A)).length === 0);
+    check("closed question: marker holds no password", !JSON.stringify(localData).includes("pw-one"), localData);
+    sent.length = 0;
+    await submit("alex", "pw-one", null);
+    check("closed question is not asked again", notifications().length === 0, sent);
+    // a new password revision of the item invalidates the marker
+    ITEMS = [login("a1", "A", "alex", "pw-one"), B, C];
+    (ITEMS[0].login as any).passwordRevisionDate = "2026-02-02";
+    sent.length = 0;
+    await submit("alex", "pw-one", null);
+    check("changed password revision: asked again", (await kinds()).join() === "confirmLogin", sent);
+    // clearing the stored outcomes clears the markers too
+    ITEMS = BASE_ITEMS;
+    await ns.close(notifications()[0]?.token);
+    await outcomes.clear();
+    sent.length = 0;
+    await submit("alex", "pw-one", null);
+    check("after clearing outcomes: asked again", (await kinds()).join() === "confirmLogin", sent);
+  });
+
+  await run("no question on a page blocked for autofill", async () => {
+    const away = { url: "https://sso.example.org/x", topFrame: frame("https://sso.example.org/x"), frames: [] };
+    await reset();
+    await submit("alex", "pw-one", away);
+    check("control: unknown on another site asks", (await kinds()).join() === "confirmLogin", sent);
+    await reset({ blockedDomains: ["sso.example.org"] });
+    await submit("alex", "pw-one", away);
+    check("no question on a page blocked for autofill", notifications().length === 0, sent);
+  });
+
+  await run("shared organization item", async () => {
+    await reset();
+    // the same organization item seen through both accounts; findDuplicates keeps only the first copy
+    const S1 = { ...login("a1", "S", "alex", "pw-one"), organizationId: "org1" } as ItemView;
+    const S2 = { ...login("a2", "S", "alex", "pw-one"), organizationId: "org1" } as ItemView;
+    ITEMS = [S1, S2, B, C];
+    await outcomes.record(S1, true); // the first copy is known, the second is not
+    await submit("alex", "pw-one", null);
+    const d = notifications()[0] ? await ns.dataFor(notifications()[0].token) : null;
+    check("shared item: conflict found through the other account's copy", d?.kind === "confirmLogin" && d.confirmItem?.accountLabel === "Arbeit", d);
+  });
+
+  await run("SPA timer path", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    probeState = SUCCESS;
+    await submitSpa("alex", "pw-one");
+    await sleep(DELAY);
+    check("SPA timer path records success without navigation", (await recordsOf(A)).A?.ok === true);
+  });
+
+  await run("SPA failure is re-checked", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    let calls = 0;
+    probeImpl = async () => (++calls === 1 ? FAILURE : SUCCESS);
+    await submitSpa("alex", "pw-one");
+    await sleep(DELAY);
+    check("SPA failure: not recorded on the first look", Object.keys(await recordsOf(A)).length === 0, await recordsOf(A));
+    await sleep(DELAY);
+    const r = await recordsOf(A);
+    check("SPA slow login: form gone on re-check is no failure", r.A?.ok !== false && calls === 2, { r, calls });
+  });
+
+  await run("SPA failure confirmed on re-check", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    probeState = FAILURE;
+    await submitSpa("alex", "pw-one");
+    await sleep(2 * DELAY);
+    check("SPA failure confirmed on re-check is recorded", (await recordsOf(A)).A?.ok === false);
+  });
+
+  await run("timer and navigation overlap", async () => {
+    await reset({ promptSave: false, promptUpdate: false });
+    let release: (v: any) => void = () => {};
+    let calls = 0;
+    probeImpl = () => (++calls === 1 ? new Promise((r) => (release = r)) : Promise.resolve(SUCCESS));
+    await submitSpa("alex", "pw-one");
+    await sleep(DELAY); // the timer's probe is now running
+    for (const f of updated) f(1, { status: "loading" });
+    await settle();
+    for (const f of updated) f(1, { status: "complete" });
+    await settle();
+    release(FAILURE); // the timer saw the old login page
+    await settle();
+    await settle();
+    const r = await recordsOf(A);
+    check("overlap: old page seen by the timer is no failure", r.A?.ok !== false, { r, calls });
+    check("overlap: the load-complete observation decides", r.A?.ok === true && calls === 2, { r, calls });
   });
 
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");

@@ -12,6 +12,8 @@ interface OutcomeStore {
 }
 
 const PREFIX = "loginOutcome:";
+/** items the outcome question was shown for: { [itemId]: rev } (asked at most once per password revision) */
+const ASKED = "outcomeAsked:";
 /** account keys that have a record, so that clear() without argument can find them */
 const INDEX = "loginOutcomeAccounts";
 
@@ -27,8 +29,27 @@ export class LoginOutcomes {
     const map = { ...((await this.store.get<Record<string, OutcomeRecord>>(key)) ?? {}) };
     map[item.id] = { at: now, ok, rev: itemRev(item) };
     await this.store.set(key, map);
+    await this.index(item.accountKey);
+  }
+
+  private async index(accountKey: string) {
     const idx = (await this.store.get<string[]>(INDEX)) ?? [];
-    if (!idx.includes(item.accountKey)) await this.store.set(INDEX, [...idx, item.accountKey]);
+    if (!idx.includes(accountKey)) await this.store.set(INDEX, [...idx, accountKey]);
+  }
+
+  /** Remember that the question was shown for the item at its current password revision. */
+  async markAsked(item: ItemView): Promise<void> {
+    const key = ASKED + item.accountKey;
+    const map = { ...((await this.store.get<Record<string, string>>(key)) ?? {}) };
+    map[item.id] = itemRev(item);
+    await this.store.set(key, map);
+    await this.index(item.accountKey);
+  }
+
+  /** The question was already shown for this item and password revision. */
+  async wasAsked(item: ItemView): Promise<boolean> {
+    const map = await this.store.get<Record<string, string>>(ASKED + item.accountKey);
+    return map?.[item.id] === itemRev(item);
   }
 
   /**
@@ -57,10 +78,10 @@ export class LoginOutcomes {
   async clear(accountKey?: string): Promise<void> {
     const idx = (await this.store.get<string[]>(INDEX)) ?? [];
     if (accountKey === undefined) {
-      await this.store.remove([...idx.map((k) => PREFIX + k), INDEX]);
+      await this.store.remove([...idx.flatMap((k) => [PREFIX + k, ASKED + k]), INDEX]);
       return;
     }
-    await this.store.remove(PREFIX + accountKey);
+    await this.store.remove([PREFIX + accountKey, ASKED + accountKey]);
     await this.store.set(INDEX, idx.filter((k) => k !== accountKey));
   }
 }
