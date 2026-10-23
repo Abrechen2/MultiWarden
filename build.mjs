@@ -40,6 +40,8 @@ function operaManifest(m) {
   return o;
 }
 
+const UPDATE_URL = "https://raw.githubusercontent.com/Abrechen2/MultiWarden/abrechen2/updates.json";
+
 function firefoxManifest(m) {
   const f = structuredClone(m);
   f.sidebar_action = { ...sidebarAction(m), open_at_install: false };
@@ -57,6 +59,8 @@ function firefoxManifest(m) {
     gecko: {
       id: "multiwarden@abrechen2.de",
       strict_min_version: "140.0",
+      // self-distributed updates: updates.json on the abrechen2 branch names the signed xpi of the newest GitHub release
+      update_url: UPDATE_URL,
       data_collection_permissions: { required: ["authenticationInfo", "personallyIdentifyingInfo", "financialAndPaymentInfo"] },
     },
   };
