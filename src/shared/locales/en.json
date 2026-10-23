@@ -1181,5 +1181,6 @@
  "Auf diesem Gerät nie genutzt": "Never used on this device",
  "Auf diesem Gerät seit {date} nicht genutzt": "Not used on this device since {date}",
  "In mehreren Konten gleiches Passwort": "Same password in several accounts",
- "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "The same password in different accounts. The comparison happens in memory only."
+ "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "The same password in different accounts. The comparison happens in memory only.",
+ "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "“Never used” only becomes meaningful once MultiWarden has been used here for 12 months."
 }

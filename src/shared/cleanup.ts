@@ -1,6 +1,5 @@
 // Cleanup checks over the decrypted vault. Pure and in memory only; nothing here is persisted.
 import type { Evidence } from "./dup-evidence";
-import { sameSharedItem } from "./duplicates";
 import { CipherType, ItemView } from "./types";
 import { isPortScopedHost, parseUrl } from "./uri";
 
@@ -40,23 +39,38 @@ export function portlessLocalUris(items: ItemView[]): { item: ItemView; uri: str
   return out;
 }
 
-/** Logins never filled on this device, or not within the last STALE_MS. */
+/**
+ * Logins not filled on this device within STALE_MS. "Never used" only counts once this device's usage
+ * data spans a year (oldest timestamp over all accounts); before that only entries with a known, old
+ * last use are listed and `neverUsedMeaningful` is false.
+ */
 export function staleOnThisDevice(
   items: ItemView[],
   lastUsed: Evidence["lastUsed"],
   now: number,
-): { item: ItemView; lastUsed?: number }[] {
-  const out: { item: ItemView; lastUsed?: number }[] = [];
+): { entries: { item: ItemView; lastUsed?: number }[]; neverUsedMeaningful: boolean } {
+  let oldest = Infinity;
+  for (const perAccount of Object.values(lastUsed)) for (const t of Object.values(perAccount)) oldest = Math.min(oldest, t);
+  const neverUsedMeaningful = oldest < now - STALE_MS;
+  const entries: { item: ItemView; lastUsed?: number }[] = [];
   for (const item of activeLogins(items)) {
     const t = lastUsed[item.accountKey]?.[item.id];
-    if (t === undefined || now - t > STALE_MS) out.push({ item, lastUsed: t });
+    if (t === undefined ? neverUsedMeaningful : now - t > STALE_MS) entries.push({ item, lastUsed: t });
   }
-  return out;
+  return { entries, neverUsedMeaningful };
 }
 
 /** Groups of logins with the same password that span at least two accounts; a shared item counts once. */
 export function reusedAcrossAccounts(items: ItemView[]): ItemView[][] {
-  const live = activeLogins(items).filter((i, idx, all) => !!i.login!.password && !all.slice(0, idx).some((e) => sameSharedItem(e, i)));
+  const seenShared = new Set<string>();
+  const live = activeLogins(items).filter((i) => {
+    if (!i.login!.password) return false;
+    if (!i.organizationId || !i.id) return true;
+    const id = JSON.stringify([i.organizationId, i.id]);
+    if (seenShared.has(id)) return false;
+    seenShared.add(id);
+    return true;
+  });
   const groups = new Map<string, ItemView[]>();
   for (const i of live) {
     const pw = i.login!.password!;

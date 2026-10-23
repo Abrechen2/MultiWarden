@@ -65,18 +65,30 @@ check("app URI not flagged", !pn.includes(appLocal.name), pn);
 check("deleted ignored", p.length === 3, p.length);
 check("flagged URI is reported", p.find((x) => x.item === ip)?.uri === "https://10.0.0.5", p);
 
-// staleOnThisDevice
+// staleOnThisDevice: "never used" only counts once the usage data spans a year
 const now = Date.UTC(2026, 9, 23);
+const DAY = 24 * 60 * 60 * 1000;
 const never = login(["https://example.de"]);
 const old = login(["https://example.de"]);
 const recent = login(["https://example.de"]);
-const lastUsed = { a: { [old.id]: now - 400 * 24 * 60 * 60 * 1000, [recent.id]: now - 30 * 24 * 60 * 60 * 1000 } };
-const st = staleOnThisDevice([never, old, recent, login([], { deletedDate: "2026-01-01" })], lastUsed, now);
-check("never used is stale", st.some((x) => x.item === never && x.lastUsed === undefined), st);
-check("used 13 months ago is stale", st.some((x) => x.item === old && x.lastUsed === lastUsed.a[old.id]), st);
-check("used last month is not stale", !st.some((x) => x.item === recent), st);
-check("deleted ignored", st.length === 2, st.length);
-check("boundary: exactly a year is not stale", staleOnThisDevice([never], { a: { [never.id]: now - STALE_MS } }, now).length === 0);
+const anchor = login(["https://example.de"]);
+const fresh = { a: { [old.id]: now - 400 * DAY, [recent.id]: now - 30 * DAY } };
+const yearOld = { a: { ...fresh.a, [anchor.id]: now - 500 * DAY } };
+const del = login([], { deletedDate: "2026-01-01" });
+const ids = (r: { entries: { item: ItemView }[] }) => r.entries.map((x) => x.item);
+const oneYear = staleOnThisDevice([never, old, recent, del], yearOld, now);
+check("year of data: never used is listed", ids(oneYear).includes(never) && oneYear.neverUsedMeaningful === true, oneYear);
+check("year of data: used 13 months ago is listed", oneYear.entries.some((x) => x.item === old && x.lastUsed === yearOld.a[old.id]), oneYear);
+check("used last month is not listed", !ids(oneYear).includes(recent));
+check("deleted ignored", !ids(oneYear).includes(del));
+const young = staleOnThisDevice([never, old, recent], { a: { [old.id]: now - 100 * DAY, [recent.id]: now - 30 * DAY } }, now);
+check("a few months of data: never used is NOT listed", !ids(young).includes(never) && young.neverUsedMeaningful === false, young);
+const noData = staleOnThisDevice([never, old], {}, now);
+check("no data: nothing listed, not meaningful", noData.entries.length === 0 && noData.neverUsedMeaningful === false, noData);
+// an entry used 13 months ago is itself proof of a year of data, so the short regime never contains one
+check("a 13 month old use makes never-used meaningful", staleOnThisDevice([never, old], { a: { [old.id]: now - 400 * DAY } }, now).neverUsedMeaningful === true);
+check("oldest timestamp across accounts counts", staleOnThisDevice([never], { a: { x: now - 10 * DAY }, b: { y: now - 400 * DAY } }, now).neverUsedMeaningful === true);
+check("boundary: exactly a year is not stale", staleOnThisDevice([never], { a: { [never.id]: now - STALE_MS } }, now).entries.length === 0);
 
 // reusedAcrossAccounts
 const same = (acc: string, pw: string, extra: Partial<ItemView> = {}) => login(["https://example.de"], { accountKey: acc, ...extra }, pw);

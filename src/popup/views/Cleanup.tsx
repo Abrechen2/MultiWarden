@@ -1,7 +1,12 @@
 // "Aufräumen" tool: read-only checks for logins that look neglected. No bulk actions; every entry
 // opens the item so the user decides.
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { portlessLocalUris, reusedAcrossAccounts, staleOnThisDevice, withoutWebsite } from "../../shared/cleanup";
+import {
+  portlessLocalUris,
+  reusedAcrossAccounts,
+  staleOnThisDevice,
+  withoutWebsite,
+} from "../../shared/cleanup";
 import { Evidence } from "../../shared/dup-evidence";
 import { t } from "../../shared/i18n";
 import { ItemView } from "../../shared/types";
@@ -18,53 +23,110 @@ export function CleanupTool() {
   const app = useApp();
   const toast = useToast();
   const [accountKey, setAccountKey, accounts] = useToolAccount(true);
-  const [open, setOpen] = useState<Record<string, boolean>>({ nosite: true, noport: true, stale: true, reuse: true });
-  // null while loading or after a failure: "not used for long" is then unavailable, not "everything unused"
+  const [open, setOpen] = useState<Record<string, boolean>>({
+    nosite: true,
+    noport: true,
+    stale: true,
+    reuse: true,
+  });
+  // while loading or after a failure "not used for long" is unavailable, not "everything unused"
   const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const [evidenceFailed, setEvidenceFailed] = useState(false);
   useEffect(() => {
     call("usageEvidence", {})
       .then(setEvidence)
       .catch(() => {
-        setEvidence(null);
+        setEvidenceFailed(true);
         toast.show(t("Nutzungsdaten konnten nicht geladen werden"), "error");
       });
   }, []);
 
   // the cross-account reuse check always looks at every unlocked account, whatever the selector says
   const all = app.vault.items;
-  const scoped = useMemo(() => all.filter((i) => accountKey === ALL_ACCOUNTS || i.accountKey === accountKey), [all, accountKey]);
+  const scoped = useMemo(
+    () =>
+      all.filter(
+        (i) => accountKey === ALL_ACCOUNTS || i.accountKey === accountKey,
+      ),
+    [all, accountKey],
+  );
   const nosite = useMemo(() => withoutWebsite(scoped), [scoped]);
   const noport = useMemo(() => portlessLocalUris(scoped), [scoped]);
-  const stale = useMemo(() => (evidence ? staleOnThisDevice(scoped, evidence.lastUsed, Date.now()) : null), [scoped, evidence]);
+  const stale = useMemo(
+    () =>
+      evidence
+        ? staleOnThisDevice(scoped, evidence.lastUsed, Date.now())
+        : null,
+    [scoped, evidence],
+  );
   const reuse = useMemo(
-    () => reusedAcrossAccounts(all).filter((g) => accountKey === ALL_ACCOUNTS || g.some((i) => i.accountKey === accountKey)),
+    () =>
+      reusedAcrossAccounts(all).filter(
+        (g) =>
+          accountKey === ALL_ACCOUNTS ||
+          g.some((i) => i.accountKey === accountKey),
+      ),
     [all, accountKey],
   );
   const spanning = accountKey === ALL_ACCOUNTS;
 
-  if (!accounts.length) return <div class="empty">{t("Keine entsperrten Konten.")}</div>;
+  if (!accounts.length)
+    return <div class="empty">{t("Keine entsperrten Konten.")}</div>;
 
   const Row = ({ i, info }: { i: ItemView; info?: string }) => (
-    <div class="row" role="button" tabIndex={0} onClick={() => app.go({ name: "item", key: itemKey(i) })} data-testid="cleanup-item">
-      <ItemIcon item={i} acc={app.accountMap.get(i.accountKey)} favicons={app.state.settings.showFavicons} />
+    <div
+      class="row"
+      role="button"
+      tabIndex={0}
+      onClick={() => app.go({ name: "item", key: itemKey(i) })}
+      data-testid="cleanup-item"
+    >
+      <ItemIcon
+        item={i}
+        acc={app.accountMap.get(i.accountKey)}
+        favicons={app.state.settings.showFavicons}
+      />
       <div class="text">
         <div class="title">
           <span class="t">{i.name}</span>
-          {(spanning || accountKey !== i.accountKey) && <AccountBadge acc={app.accountMap.get(i.accountKey)} />}
+          {(spanning || accountKey !== i.accountKey) && (
+            <AccountBadge acc={app.accountMap.get(i.accountKey)} />
+          )}
         </div>
         <div class="subtitle">
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{[i.login?.username, info].filter(Boolean).join(" · ")}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+            {[i.login?.username, info].filter(Boolean).join(" · ")}
+          </span>
         </div>
       </div>
     </div>
   );
 
-  const Section = ({ id, title, count, desc, children }: { id: SectionId; title: string; count: number | null; desc: string; children?: any }) => (
+  const Section = ({
+    id,
+    title,
+    count,
+    desc,
+    children,
+  }: {
+    id: SectionId;
+    title: string;
+    count: number | null;
+    desc: string;
+    children?: any;
+  }) => (
     <section class="report-section" data-testid={"cleanup-" + id}>
-      <button class="report-head" onClick={() => setOpen({ ...open, [id]: !open[id] })} aria-expanded={open[id]}>
+      <button
+        class="report-head"
+        onClick={() => setOpen({ ...open, [id]: !open[id] })}
+        aria-expanded={open[id]}
+      >
         <span class="grow">{title}</span>
         {count != null && (
-          <span class={"count" + (count > 0 ? " bad" : " ok")} data-testid={"cleanup-count-" + id}>
+          <span
+            class={"count" + (count > 0 ? " bad" : " ok")}
+            data-testid={"cleanup-count-" + id}
+          >
             {count}
           </span>
         )}
@@ -82,17 +144,28 @@ export function CleanupTool() {
   return (
     <div data-testid="cleanup">
       <div class="tool-intro muted small">
-        {t("Zeigt Logins, die aufgeräumt werden könnten. Es wird nichts verändert; die Auswertung läuft auf deinem Gerät.")}
+        {t(
+          "Zeigt Logins, die aufgeräumt werden könnten. Es wird nichts verändert; die Auswertung läuft auf deinem Gerät.",
+        )}
       </div>
       <div class="tool-controls">
-        {accounts.length > 1 && <AccountSelect value={accountKey} onChange={setAccountKey} accounts={accounts} allowAll />}
+        {accounts.length > 1 && (
+          <AccountSelect
+            value={accountKey}
+            onChange={setAccountKey}
+            accounts={accounts}
+            allowAll
+          />
+        )}
       </div>
 
       <Section
         id="nosite"
         title={t("Ohne gültige Website")}
         count={nosite.length}
-        desc={t("Logins ohne Website, mit einer nicht lesbaren Adresse oder einem Schema, das weder Web noch App ist. Sie werden nie automatisch angeboten.")}
+        desc={t(
+          "Logins ohne Website, mit einer nicht lesbaren Adresse oder einem Schema, das weder Web noch App ist. Sie werden nie automatisch angeboten.",
+        )}
       >
         {nosite.length > 0 && (
           <div class="card">
@@ -107,7 +180,9 @@ export function CleanupTool() {
         id="noport"
         title={t("IP-Adressen ohne Port")}
         count={noport.length}
-        desc={t("Gilt nur für Port 80/443. Läuft der Dienst auf einem anderen Port, die Adresse ergänzen.")}
+        desc={t(
+          "Gilt nur für Port 80/443. Läuft der Dienst auf einem anderen Port, die Adresse ergänzen.",
+        )}
       >
         {noport.length > 0 && (
           <div class="card">
@@ -121,29 +196,50 @@ export function CleanupTool() {
       <Section
         id="stale"
         title={t("Auf diesem Gerät lange nicht genutzt")}
-        count={stale ? stale.length : null}
-        desc={t("Nicht innerhalb der letzten 12 Monate auf diesem Gerät ausgefüllt. Nur eine Information: Auf anderen Geräten können sie in Gebrauch sein.")}
+        count={stale ? stale.entries.length : null}
+        desc={t(
+          "Nicht innerhalb der letzten 12 Monate auf diesem Gerät ausgefüllt. Nur eine Information: Auf anderen Geräten können sie in Gebrauch sein.",
+        )}
       >
         {!stale ? (
-          <div class="muted small report-action" data-testid="cleanup-stale-unavailable">
-            {t("Nutzungsdaten konnten nicht geladen werden")}
+          <div
+            class="muted small report-action"
+            data-testid="cleanup-stale-unavailable"
+          >
+            {evidenceFailed
+              ? t("Nutzungsdaten konnten nicht geladen werden")
+              : ""}
           </div>
         ) : (
-          stale.length > 0 && (
-            <div class="card">
-              {stale.map((x) => (
-                <Row
-                  key={itemKey(x.item)}
-                  i={x.item}
-                  info={
-                    x.lastUsed === undefined
-                      ? t("Auf diesem Gerät nie genutzt")
-                      : t("Auf diesem Gerät seit {date} nicht genutzt", { date: formatDay(new Date(x.lastUsed).toISOString()) })
-                  }
-                />
-              ))}
-            </div>
-          )
+          <>
+            {!stale.neverUsedMeaningful && (
+              <div
+                class="muted small report-action"
+                data-testid="cleanup-stale-young"
+              >
+                {t(
+                  "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.",
+                )}
+              </div>
+            )}
+            {stale.entries.length > 0 && (
+              <div class="card">
+                {stale.entries.map((x) => (
+                  <Row
+                    key={itemKey(x.item)}
+                    i={x.item}
+                    info={
+                      x.lastUsed === undefined
+                        ? t("Auf diesem Gerät nie genutzt")
+                        : t("Auf diesem Gerät seit {date} nicht genutzt", {
+                            date: formatDay(new Date(x.lastUsed).toISOString()),
+                          })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </Section>
 
@@ -151,7 +247,9 @@ export function CleanupTool() {
         id="reuse"
         title={t("In mehreren Konten gleiches Passwort")}
         count={reuse.reduce((n, g) => n + g.length, 0)}
-        desc={t("Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.")}
+        desc={t(
+          "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.",
+        )}
       >
         {reuse.map((g, idx) => (
           <div class="card report-group" key={idx}>
