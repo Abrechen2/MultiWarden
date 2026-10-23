@@ -1,19 +1,20 @@
 // "Tools" tab: several tools side by side (like the generator modes).
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { compareGroup, findDuplicates, DuplicateMode } from "../../shared/duplicates";
+import { Evidence, assessGroup, GroupAssessment } from "../../shared/dup-evidence";
 import { t } from "../../shared/i18n";
-import { CipherType } from "../../shared/types";
+import { CipherType, ItemView } from "../../shared/types";
 import { useApp } from "../app-state";
-import { ItemIcon, useToast } from "../components";
+import { AccountBadge, ItemIcon, useToast } from "../components";
 import { useDialogs } from "../dialogs";
 import { Icon } from "../icons";
 import { call } from "../rpc";
 import { formatDate, itemKey, TYPE_LABEL } from "../util";
-import { DupCompareSummary, DupItemDiffs } from "./dup-compare";
+import { DupCompareSummary, DupEvidenceLine, DupItemDiffs, fieldLabel } from "./dup-compare";
 import { SendTool } from "./Send";
 import { PasswordReportTool } from "./PasswordReport";
 import { isSendLink, SendReceiveTool } from "./SendReceive";
-import { AccountSelect, useToolAccount } from "./tool-account";
+import { ALL_ACCOUNTS, AccountSelect, useToolAccount } from "./tool-account";
 
 type Tab = "duplicates" | "report" | "send" | "receive";
 const TABS: Tab[] = ["duplicates", "report", "send", "receive"];
@@ -85,43 +86,75 @@ function DuplicatesTool() {
   const app = useApp();
   const toast = useToast();
   const dialogs = useDialogs();
-  const [accountKey, setAccountKey, accounts] = useToolAccount();
+  const [accountKey, setAccountKey, accounts] = useToolAccount(true);
   const [mode, setMode] = useState<DuplicateMode>("site");
   const [busy, setBusy] = useState(false);
+  // null until the evidence arrived: a clean-up before that would pick the entry to keep blindly
+  const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const loadEvidence = () =>
+    call("usageEvidence", {})
+      .then(setEvidence)
+      .catch(() => setEvidence({ lastUsed: {}, outcomes: {} }));
+  useEffect(() => {
+    void loadEvidence();
+  }, []);
   const groups = useMemo(
     () =>
       findDuplicates(
-        app.vault.items.filter((i) => i.accountKey === accountKey),
+        app.vault.items.filter((i) => accountKey === ALL_ACCOUNTS || i.accountKey === accountKey),
         mode,
       ),
     [app.vault, accountKey, mode],
   );
   const total = groups.reduce((n, g) => n + g.items.length, 0);
+  const accountLabel = (key: string) => app.accountMap.get(key)?.label ?? key;
+  const placeOf = (i: ItemView) =>
+    (i.organizationId
+      ? app.vault.organizations.find((o) => o.accountKey === i.accountKey && o.id === i.organizationId)?.name
+      : i.folderId
+        ? app.vault.folders.find((f) => f.accountKey === i.accountKey && f.id === i.folderId)?.name
+        : "") ?? "";
 
-  const trash = async (ids: { id: string; name: string }[]) => {
+  const trash = async (items: { accountKey: string; id: string; name: string }[]) => {
     setBusy(true);
     let ok = 0;
     let firstError = "";
-    for (const it of ids) {
-      const r = await call("deleteItem", { accountKey, itemId: it.id });
+    for (const it of items) {
+      const r = await call("deleteItem", { accountKey: it.accountKey, itemId: it.id });
       if (r.ok) ok++;
       else firstError ||= r.error ?? t("Fehler");
     }
     await app.reloadVault();
+    await loadEvidence();
     setBusy(false);
     if (firstError) toast.show(t("{n} in den Papierkorb verschoben, Fehler: {error}", { n: ok, error: firstError }), "error");
     else toast.show(ok === 1 ? t("In den Papierkorb verschoben") : t("{n} Einträge in den Papierkorb verschoben", { n: ok }));
+  };
+
+  const clean = async (a: GroupAssessment) => {
+    const lines = a.removable.map((i) => {
+      const unique = a.uniqueFieldsOf(i).map(fieldLabel);
+      return (
+        `„${i.name}“ (${accountLabel(i.accountKey)})` +
+        (unique.length ? `\n   ${t("Nur in diesem Eintrag: {fields}", { fields: unique.join(", ") })}` : "")
+      );
+    });
+    const ok = await dialogs.confirm({
+      title: t("Duplikate entfernen?"),
+      message: lines.join("\n"),
+      okLabel: t("In den Papierkorb"),
+      danger: true,
+    });
+    if (ok) await trash(a.removable.map((i) => ({ accountKey: i.accountKey, id: i.id, name: i.name })));
   };
 
   if (!accounts.length) return <div class="empty">{t("Keine entsperrten Konten.")}</div>;
 
   return (
     <div data-testid="duplicates">
-      <div class="tool-intro muted small">
-        {t("Sucht doppelte Einträge innerhalb eines Kontos. Duplikate zwischen verschiedenen Konten werden nicht erkannt.")}
-      </div>
+      <div class="tool-intro muted small">{t("Sucht doppelte Einträge in einem oder allen entsperrten Konten.")}</div>
       <div class="tool-controls">
-        {accounts.length > 1 && <AccountSelect value={accountKey} onChange={setAccountKey} accounts={accounts} />}
+        {accounts.length > 1 && <AccountSelect value={accountKey} onChange={setAccountKey} accounts={accounts} allowAll />}
         <label class="tool-account">
           <span>{t("Logins sind doppelt bei gleicher")}</span>
           <select value={mode} onChange={(e) => setMode((e.target as HTMLSelectElement).value as DuplicateMode)} data-testid="dup-mode">
@@ -145,14 +178,9 @@ function DuplicatesTool() {
             </h2>
           </div>
           {groups.map((g) => {
-            const removable = g.items.slice(1).filter((i) => i.edit);
-            const placeOf = (i: (typeof g.items)[number]) =>
-              (i.organizationId
-                ? app.vault.organizations.find((o) => o.accountKey === i.accountKey && o.id === i.organizationId)?.name
-                : i.folderId
-                  ? app.vault.folders.find((f) => f.accountKey === i.accountKey && f.id === i.folderId)?.name
-                  : "") ?? "";
+            const assessment = assessGroup(g, evidence ?? { lastUsed: {}, outcomes: {} }, placeOf);
             const diff = compareGroup(g.items, placeOf);
+            const acrossAccounts = new Set(g.items.map((i) => i.accountKey)).size > 1;
             return (
               <section class="dup-group" key={g.key} data-testid="dup-group">
                 <div class="dup-head">
@@ -162,27 +190,17 @@ function DuplicatesTool() {
                       {TYPE_LABEL[g.type]} · {t("{n} Einträge", { n: g.items.length })}
                       {g.type === CipherType.Login &&
                         (g.samePassword ? " · " + t("gleiches Passwort") : " · " + t("unterschiedliche Passwörter"))}
+                      {assessment.unclear && " · " + t("Unklar – bitte selbst prüfen")}
                     </div>
                   </div>
-                  {removable.length > 0 && (
+                  {assessment.removable.length > 0 && (
                     <button
                       class="btn btn-ghost btn-sm"
-                      disabled={busy}
-                      data-testid="dup-keep-newest"
-                      onClick={async () => {
-                        const ok = await dialogs.confirm({
-                          title: t("Duplikate entfernen?"),
-                          message: t(
-                            "Der zuletzt geänderte Eintrag „{name}“ bleibt erhalten, {n} weitere kommen in den Papierkorb (dort wiederherstellbar).",
-                            { name: g.items[0].name, n: removable.length },
-                          ),
-                          okLabel: t("In den Papierkorb"),
-                          danger: true,
-                        });
-                        if (ok) await trash(removable);
-                      }}
+                      disabled={busy || !evidence}
+                      data-testid="dup-clean"
+                      onClick={() => clean(assessment)}
                     >
-                      {t("Nur neuesten behalten")}
+                      {t("Bereinigen")}
                     </button>
                   )}
                 </div>
@@ -195,6 +213,7 @@ function DuplicatesTool() {
                     const org = i.organizationId
                       ? app.vault.organizations.find((o) => o.accountKey === i.accountKey && o.id === i.organizationId)
                       : undefined;
+                    const ev = assessment.evidence.get(i);
                     return (
                       <div
                         class="row"
@@ -209,7 +228,8 @@ function DuplicatesTool() {
                         <div class="text">
                           <div class="title">
                             <span class="t">{i.name}</span>
-                            {idx === 0 && <span class="pill">{t("neuester")}</span>}
+                            {acrossAccounts && <AccountBadge acc={app.accountMap.get(i.accountKey)} />}
+                            {assessment.recommended === i && <span class="pill">{t("vermutlich aktuell")}</span>}
                           </div>
                           <div class="subtitle">
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -222,6 +242,7 @@ function DuplicatesTool() {
                                 .join(" · ")}
                             </span>
                           </div>
+                          {ev && <DupEvidenceLine ev={ev} />}
                           <DupItemDiffs diff={diff} idx={idx} />
                         </div>
                         <div class="actions" onClick={(e) => e.stopPropagation()}>

@@ -1,6 +1,8 @@
 // Duplicate check: what is the same and what differs inside a group (summary + per-entry differences).
+import { ItemEvidence } from "../../shared/dup-evidence";
 import { FieldDiff } from "../../shared/duplicates";
 import { t, tk } from "../../shared/i18n";
+import { formatDate } from "../util";
 import { EXTRA_FIELDS, IDENTITY_FIELDS } from "./item-fields";
 
 const BASE_LABELS: Record<string, string> = {
@@ -84,6 +86,29 @@ export function DupItemDiffs({ diff, idx }: { diff: FieldDiff[]; idx: number }) 
           <span class="k">{fieldLabel(d.key)}:</span> <span class="v">{shown(d, idx)}</span>
         </span>
       ))}
+    </div>
+  );
+}
+
+/** What is known about one entry of a group with differing passwords (dates, last use, login outcome, successor). */
+export function DupEvidenceLine({ ev }: { ev: ItemEvidence }) {
+  const at = (ms: number) => formatDate(new Date(ms).toISOString());
+  const parts = [
+    ev.passwordChanged &&
+      (ev.passwordChangedIsCreation
+        ? t("Angelegt {date}", { date: formatDate(ev.passwordChanged) })
+        : t("Passwort geändert {date}", { date: formatDate(ev.passwordChanged) })),
+    ev.lastUsed && t("Auf diesem Gerät zuletzt ausgefüllt {date}", { date: at(ev.lastUsed) }),
+    ev.outcome &&
+      (ev.outcome.ok
+        ? t("Anmeldung erfolgreich {date}", { date: at(ev.outcome.at) })
+        : t("Anmeldung fehlgeschlagen {date}", { date: at(ev.outcome.at) })),
+    ev.supersededBy && t("Veraltet: Passwort steht im Verlauf von „{name}“", { name: ev.supersededBy.name }),
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <div class="muted small" data-testid="dup-evidence">
+      {parts.join(" · ")}
     </div>
   );
 }
