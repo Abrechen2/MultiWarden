@@ -1161,5 +1161,6 @@
  "vermutlich aktuell": "probablemente actual",
  "Unklar – bitte selbst prüfen": "Poco claro: compruébalo tú mismo",
  "Bereinigen": "Limpiar",
- "Nur in diesem Eintrag: {fields}": "Solo en este elemento: {fields}"
+ "Nur in diesem Eintrag: {fields}": "Solo en este elemento: {fields}",
+ "Nutzungsdaten konnten nicht geladen werden": "No se pudieron cargar los datos de uso"
 }

@@ -91,10 +91,14 @@ function DuplicatesTool() {
   const [busy, setBusy] = useState(false);
   // null until the evidence arrived: a clean-up before that would pick the entry to keep blindly
   const [evidence, setEvidence] = useState<Evidence | null>(null);
+  // on failure the evidence stays null: the bulk clean-up stays disabled instead of guessing without it
   const loadEvidence = () =>
     call("usageEvidence", {})
       .then(setEvidence)
-      .catch(() => setEvidence({ lastUsed: {}, outcomes: {} }));
+      .catch(() => {
+        setEvidence(null);
+        toast.show(t("Nutzungsdaten konnten nicht geladen werden"), "error");
+      });
   useEffect(() => {
     void loadEvidence();
   }, []);
@@ -190,7 +194,7 @@ function DuplicatesTool() {
                       {TYPE_LABEL[g.type]} · {t("{n} Einträge", { n: g.items.length })}
                       {g.type === CipherType.Login &&
                         (g.samePassword ? " · " + t("gleiches Passwort") : " · " + t("unterschiedliche Passwörter"))}
-                      {assessment.unclear && " · " + t("Unklar – bitte selbst prüfen")}
+                      {evidence && assessment.unclear && " · " + t("Unklar – bitte selbst prüfen")}
                     </div>
                   </div>
                   {assessment.removable.length > 0 && (
@@ -229,7 +233,7 @@ function DuplicatesTool() {
                           <div class="title">
                             <span class="t">{i.name}</span>
                             {acrossAccounts && <AccountBadge acc={app.accountMap.get(i.accountKey)} />}
-                            {assessment.recommended === i && <span class="pill">{t("vermutlich aktuell")}</span>}
+                            {evidence && assessment.recommended === i && <span class="pill">{t("vermutlich aktuell")}</span>}
                           </div>
                           <div class="subtitle">
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -242,7 +246,7 @@ function DuplicatesTool() {
                                 .join(" · ")}
                             </span>
                           </div>
-                          {ev && <DupEvidenceLine ev={ev} />}
+                          {evidence && ev && <DupEvidenceLine ev={ev} />}
                           <DupItemDiffs diff={diff} idx={idx} />
                         </div>
                         <div class="actions" onClick={(e) => e.stopPropagation()}>

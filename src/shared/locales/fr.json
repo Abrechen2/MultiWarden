@@ -1161,5 +1161,6 @@
  "vermutlich aktuell": "probablement à jour",
  "Unklar – bitte selbst prüfen": "Pas clair – à vérifier vous-même",
  "Bereinigen": "Nettoyer",
- "Nur in diesem Eintrag: {fields}": "Uniquement dans cet élément : {fields}"
+ "Nur in diesem Eintrag: {fields}": "Uniquement dans cet élément : {fields}",
+ "Nutzungsdaten konnten nicht geladen werden": "Impossible de charger les données d'utilisation"
 }

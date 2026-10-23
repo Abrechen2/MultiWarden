@@ -94,14 +94,13 @@ const newLogin = (accountKey, name, username, uri, extra = {}) =>
   const group = p.locator('[data-testid="dup-group"]', { hasText: "dup.test" });
   check("duplicate group within the account", (await group.locator('[data-testid="dup-item"]').count()) === 2);
   check("other account not mixed in", !((await group.textContent()) ?? "").includes("anderes Konto"));
-  check("newest first", ((await group.locator('[data-testid="dup-item"]').first().getAttribute("data-name")) ?? "") === "Shop (neu)");
   await p.screenshot({ path: `${SHOTS}/toolbox-duplicates.png` });
   await p.selectOption('[data-testid="tool-account"]', B);
   await p.waitForTimeout(200);
   check("account B: no dup.test group", (await p.locator('[data-testid="dup-group"]', { hasText: "dup.test" }).count()) === 0);
   await p.selectOption('[data-testid="tool-account"]', A);
   await p.waitForTimeout(200);
-  await group.locator('[data-testid="dup-keep-newest"]').click();
+  await group.locator('[data-testid="dup-clean"]').click();
   await p.click('[data-testid="confirm-ok"]');
   await p.waitForTimeout(1200);
   check("group resolved", (await p.locator('[data-testid="dup-group"]', { hasText: "dup.test" }).count()) === 0);

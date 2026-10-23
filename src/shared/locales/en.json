@@ -1161,5 +1161,6 @@
  "vermutlich aktuell": "probably current",
  "Unklar – bitte selbst prüfen": "Unclear – please check yourself",
  "Bereinigen": "Clean up",
- "Nur in diesem Eintrag: {fields}": "Only in this item: {fields}"
+ "Nur in diesem Eintrag: {fields}": "Only in this item: {fields}",
+ "Nutzungsdaten konnten nicht geladen werden": "Usage data could not be loaded"
 }
