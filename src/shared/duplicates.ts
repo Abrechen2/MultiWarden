@@ -1,6 +1,6 @@
-// Duplicate check within the items of ONE account (callers pass that account's items only).
+// Duplicate check over the items passed in – one account or several (callers pass unlocked accounts only).
 import { CipherType, ItemView } from "./types";
-import { hostnameOf } from "./uri";
+import { isPortScopedHost, parseUrl } from "./uri";
 
 export type DuplicateMode = "site" | "sitePassword";
 
@@ -20,8 +20,12 @@ function hostsOf(item: ItemView): string[] {
   const out = new Set<string>();
   for (const u of item.login?.uris ?? []) {
     if (!u.uri.trim()) continue;
-    const h = hostnameOf(u.uri.trim());
-    if (h) out.add(h.replace(/^www\./, ""));
+    const parsed = parseUrl(u.uri.trim());
+    if (!parsed) continue;
+    const hostname = parsed.hostname.toLowerCase();
+    // IPs, localhost and single-label hosts: every port is its own service (same rule as URI matching)
+    const h = isPortScopedHost(hostname) ? parsed.host.toLowerCase() : hostname;
+    out.add(h.replace(/^www\./, ""));
   }
   return [...out];
 }
@@ -157,7 +161,8 @@ export function compareGroup(items: ItemView[], folderName: (i: ItemView) => str
   if (!items.length) return [];
   const out: FieldDiff[] = [];
   for (const { key, secret, get } of gettersFor(items, folderName)) {
-    const raw = items.map((i) => get(i).trim());
+    // secrets are compared exactly: a trailing space is a different password
+    const raw = items.map((i) => (secret ? get(i) : get(i).trim()));
     if (raw.every((v) => !v)) continue;
     const distinct: string[] = [];
     const variants = raw.map((v) => {
@@ -177,13 +182,21 @@ export function compareGroup(items: ItemView[], folderName: (i: ItemView) => str
   return [...out.filter((d) => !d.same), ...out.filter((d) => d.same)];
 }
 
+/** The same shared (organization) item as seen through two accounts: same organization and id. */
+export function sameSharedItem(a: ItemView, b: ItemView): boolean {
+  return !!a.organizationId && a.organizationId === b.organizationId && !!a.id && a.id === b.id;
+}
+
 /**
  * Groups of duplicate entries (at least two each). Deleted entries and entries that could not be
  * decrypted are ignored. Logins are duplicates when they have the same username on the same website
- * (host without "www."); in mode "sitePassword" the password must match as well.
+ * (host without "www."; with the port on IP / localhost / single-label hosts); in mode "sitePassword" the password must match as well.
+ * Items may come from several accounts; a shared item seen by two accounts counts once.
  */
 export function findDuplicates(items: ItemView[], mode: DuplicateMode = "site"): DuplicateGroup[] {
-  const live = items.filter((i) => !i.deletedDate && !i.decryptError);
+  const live = items
+    .filter((i) => !i.deletedDate && !i.decryptError)
+    .filter((i, idx, all) => !all.slice(0, idx).some((e) => sameSharedItem(e, i)));
   const parent = live.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   const firstByKey = new Map<string, number>();

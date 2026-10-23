@@ -1,6 +1,6 @@
 // Duplicate check: per group, which fields are the same and which differ – secrets only as variants.
 import "./chrome-stub";
-import { compareGroup } from "../src/shared/duplicates";
+import { compareGroup, findDuplicates } from "../src/shared/duplicates";
 import { CipherType, ItemView } from "../src/shared/types";
 
 let failed = 0;
@@ -84,6 +84,28 @@ const folderName = (i: ItemView) => (i.folderId === "f1" ? "Privat" : i.folderId
   check("card number secret", d3.find((d) => d.key === "card:number")?.secret === true);
   check("card expiry visible and different", d3.find((d) => d.key === "card:expMonth")?.same === false && d3.find((d) => d.key === "card:expMonth")?.secret === false);
   check("cardholder same", d3.find((d) => d.key === "card:cardholderName")?.same === true);
+
+  // port rule, exact secrets, cross-account grouping
+  const ip = (id: string, uri: string, o: Partial<ItemView> = {}) => ({ ...login(id, { username: "admin", password: "pw", uris: [uri] }), ...o });
+  check("IP logins on different ports are not duplicates", findDuplicates([ip("p1", "http://10.0.0.5:8080"), ip("p2", "http://10.0.0.5:5765")]).length === 0);
+  check("IP logins on the same port are duplicates", findDuplicates([ip("p1", "http://10.0.0.5:8080"), ip("p2", "https://10.0.0.5:8080/login")]).length === 1);
+  check(
+    "domain logins still group across ports",
+    findDuplicates([ip("p1", "https://nas.example.de:8443"), ip("p2", "https://nas.example.de:5001")]).length === 1,
+  );
+  const ws = compareGroup([login("w1", { password: "pw" }), login("w2", { password: "pw " })], folderName);
+  check("passwords differing only in whitespace differ", ws.find((d) => d.key === "password")?.same === false, ws);
+  const ws2 = [login("w1", { password: "pw", uris: ["https://example.de"], username: "u" }), login("w2", { password: "pw ", uris: ["https://example.de"], username: "u" })];
+  check("group samePassword is false for whitespace difference", findDuplicates(ws2)[0]?.samePassword === false);
+  const nm = compareGroup([login("n1", { name: "Mail" }), login("n2", { name: "Mail " })], folderName);
+  check("non-secret fields are still trimmed", nm.find((d) => d.key === "name")?.same === true, nm);
+  const acc = (id: string, accountKey: string, o: Partial<ItemView> = {}) => ({ ...ip(id, "https://example.de"), accountKey, ...o });
+  const cross = findDuplicates([acc("c1", "a"), acc("c2", "b")]);
+  check("cross-account duplicates group", cross.length === 1 && cross[0].items.map((i) => i.accountKey).sort().join() === "a,b", cross);
+  const shared = { organizationId: "o" };
+  check("shared org item seen by two accounts is one item", findDuplicates([acc("x", "a", shared), acc("x", "b", shared)]).length === 0);
+  const g3 = findDuplicates([acc("x", "a", shared), acc("x", "b", shared), acc("y", "a")]);
+  check("shared pair plus personal copy is one group of 2", g3.length === 1 && g3[0].items.length === 2, g3);
 
   console.log(failed ? `${failed} FAILED` : "ALL PASSED");
   process.exit(failed ? 1 : 0);
