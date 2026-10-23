@@ -140,6 +140,14 @@ export interface FieldView {
   linkedId?: number | null;
 }
 
+/** result of the last login with an item; never holds a password or hash */
+export interface OutcomeRecord {
+  at: number;
+  ok: boolean;
+  /** password revision of the item when the outcome was recorded */
+  rev: string;
+}
+
 export interface ItemView {
   id: string;
   accountKey: string;

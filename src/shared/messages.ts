@@ -1,8 +1,7 @@
 import type { SerializedKey } from "../crypto/bw";
-import type { AccountPublic, ItemView, ServerType, ServerUrls, Settings, VaultData } from "./types";
+import type { AccountPublic, ItemView, OutcomeRecord, ServerType, ServerUrls, Settings, VaultData } from "./types";
 import type { ForwarderId, ForwarderSettings } from "./forwarders";
 import type { ReceiveAuth, ReceiveRequest, ReceiveResult, SendEdit, SendListResponse, SendView } from "./sends";
-import type { OutcomeRecord } from "../background/login-outcomes";
 
 export interface StateResponse {
   accounts: AccountPublic[];

@@ -63,6 +63,15 @@ const item = (id: string, over: Partial<ItemView> & { rev?: string | null } = {}
     check("a password change prunes the stored record", !("i1" in stored) && "i2" in stored, stored);
   }
   {
+    const s = memStore();
+    const o = new LoginOutcomes(s);
+    await o.record(item("i1"), true, 1000);
+    const r = await o.forAccount("a1", []);
+    const stored = s.m.get("loginOutcome:a1") as Record<string, unknown>;
+    check("a record of an item missing from the list is kept in storage", "i1" in stored, stored);
+    check("a record of an item missing from the list is not returned", !r.i1, r);
+  }
+  {
     const o = new LoginOutcomes(memStore());
     const it = item("i1", { rev: null, revisionDate: "2026-02-02" });
     check("itemRev falls back to revisionDate", itemRev(it) === "2026-02-02");

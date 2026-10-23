@@ -4,7 +4,7 @@ import { LiveSync } from "./live-sync";
 import { EventType } from "../shared/events";
 import type { RpcMessage, RpcName, Rpc } from "../shared/messages";
 import { isBlockedUrl, isFillableUrl } from "../shared/uri";
-import { CipherType } from "../shared/types";
+import { CipherType, type OutcomeRecord } from "../shared/types";
 import {
   activeTab,
   FILL_INSECURE,
@@ -25,7 +25,7 @@ import { createAlias } from "./forwarders";
 import { SecretStore } from "./secret-store";
 import { Menus } from "./menus";
 import { NotificationService } from "./notify";
-import { LoginOutcomes, type OutcomeRecord } from "./login-outcomes";
+import { LoginOutcomes } from "./login-outcomes";
 import { Fido2Service } from "./fido2";
 import { neverDomains, removeNeverDomain } from "./never-domains";
 import { local, restrictSessionAccess } from "./store";

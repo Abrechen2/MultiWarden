@@ -1,14 +1,9 @@
 // Local record of whether the last login with a vault item worked. Only the verdict, the time and the
 // item's password revision are stored (never a password, hash or anything derived from it), so a record
 // stops counting as soon as the password of the item changes.
-import type { ItemView } from "../shared/types";
+import type { ItemView, OutcomeRecord } from "../shared/types";
 
-export interface OutcomeRecord {
-  at: number;
-  ok: boolean;
-  /** password revision of the item when the outcome was recorded */
-  rev: string;
-}
+export type { OutcomeRecord };
 
 interface OutcomeStore {
   get<T>(k: string): Promise<T | undefined>;
@@ -36,20 +31,26 @@ export class LoginOutcomes {
     if (!idx.includes(item.accountKey)) await this.store.set(INDEX, [...idx, item.accountKey]);
   }
 
-  /** Records still valid for the given items (same password revision); stale ones are dropped from the store. */
+  /**
+   * Records still valid for the given items (same password revision). Records whose item has a different
+   * revision are dropped from the store; records of items missing from the list are kept (the vault may be
+   * partial) but not returned.
+   */
   async forAccount(accountKey: string, items: ItemView[]): Promise<Record<string, OutcomeRecord>> {
     const key = PREFIX + accountKey;
     const stored = await this.store.get<Record<string, OutcomeRecord>>(key);
     if (!stored) return {};
     const byId = new Map(items.map((i) => [i.id, i]));
     const valid: Record<string, OutcomeRecord> = {};
+    const kept: Record<string, OutcomeRecord> = {};
     let dropped = false;
     for (const [id, rec] of Object.entries(stored)) {
       const cur = byId.get(id);
-      if (cur && rec.rev === itemRev(cur)) valid[id] = rec;
+      if (!cur) kept[id] = rec;
+      else if (rec.rev === itemRev(cur)) valid[id] = kept[id] = rec;
       else dropped = true;
     }
-    if (dropped) await this.store.set(key, valid);
+    if (dropped) await this.store.set(key, kept);
     return valid;
   }
 
