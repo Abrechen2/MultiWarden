@@ -117,10 +117,18 @@ export function assessGroup(group: DuplicateGroup, ev: Evidence, folderName: (i:
     const supersededBy = new Map<Variant, Variant | undefined>();
     /** outdated variants whose removal is backed by strong evidence (history, or a failure answered by a newer success) */
     const droppable = new Set<Variant>();
-    const markOutdated = (v: Variant, by: Variant | undefined, strong: boolean) => {
+    /**
+     * Marks v outdated, unless its password was set after every piece of evidence against it (`evidence`:
+     * times in ms, unknown ones NaN) - then the evidence predates the password and says nothing about it.
+     */
+    const markOutdated = (v: Variant, by: Variant | undefined, strong: boolean, evidence: number[]) => {
+      const known = evidence.filter(Number.isFinite);
+      if (Number.isFinite(v.date) && known.length && v.date > Math.max(...known)) return;
       if (!supersededBy.has(v) || (!supersededBy.get(v) && by)) supersededBy.set(v, by);
       if (strong) droppable.add(v);
     };
+    /** history of u speaks against another password as of u's password change and u's last success */
+    const historyEvidence = (u: Variant) => [u.date, u.latest?.ok ? u.latest.at : NaN];
     const inHistoryOf = (v: Variant, other: Variant) =>
       nonEmpty(v) && other.items.some((i) => i.passwordHistory.some((h) => h.password === v.password));
 
@@ -135,18 +143,23 @@ export function assessGroup(group: DuplicateGroup, ev: Evidence, folderName: (i:
       variants.some((v) => v !== w && nonEmpty(v) && !failed.includes(v) && v.date > w.latest!.at);
     let winner: Variant | undefined = top.length === 1 && !changedSince(top[0]) ? top[0] : undefined;
     // a failure alone may be wrong (typo-free mistakes, outages, misread pages): removal needs a newer success elsewhere
-    for (const v of failed) markOutdated(v, winner, succeeded.some((u) => u !== v && u.latest!.at > v.latest!.at));
+    const failureAnswered = (v: Variant) => succeeded.some((u) => u !== v && u.latest!.at > v.latest!.at);
+    for (const v of failed) markOutdated(v, winner, failureAnswered(v), [v.latest!.at]);
 
     if (winner) {
       // the observation says which side of a password change is live: only a password in the winner's
-      // history is older; a variant holding the winner's password in its history changed later and stays
-      for (const v of variants) if (v !== winner && !v.latest?.ok && inHistoryOf(v, winner)) markOutdated(v, winner, true);
+      // history is older; a variant holding the winner's password in its history changed later and stays.
+      // A failed variant stays bound to the failure rule: history does not make it removable.
+      for (const v of variants)
+        if (v !== winner && !v.latest?.ok && inHistoryOf(v, winner))
+          markOutdated(v, winner, !failed.includes(v) || failureAnswered(v), historyEvidence(winner));
     } else {
       // rule 2: a password found in another entry's history is outdated, unless that goes both ways.
       // History of a variant that failed counts for nothing; a variant with a working login is never outdated by it.
       for (const v of variants)
         for (const u of variants)
-          if (u !== v && !v.latest?.ok && !failed.includes(u) && inHistoryOf(v, u) && !inHistoryOf(u, v)) markOutdated(v, u, true);
+          if (u !== v && !v.latest?.ok && !failed.includes(u) && inHistoryOf(v, u) && !inHistoryOf(u, v))
+            markOutdated(v, u, true, historyEvidence(u));
       // rule 3: the unique newest password date among the variants that are not outdated
       const alive = variants.filter((v) => !supersededBy.has(v));
       if (alive.length === 1 && nonEmpty(alive[0])) winner = alive[0];

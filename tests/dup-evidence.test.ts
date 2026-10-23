@@ -43,7 +43,8 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   check("keep holds both variants", ids(r.keep).join() === "new,old");
 }
 {
-  const a = login("a1", { password: "pw1", pwDate: "2025-09-01T00:00:00Z" });
+  // (R19: a's password must be older than b's change, else the history predates it and says nothing)
+  const a = login("a1", { password: "pw1", pwDate: "2024-09-01T00:00:00Z" });
   const b = login("b1", { password: "pw2", pwDate: "2025-01-01T00:00:00Z", history: ["pw1"] });
   const r = assessGroup(group([a, b], false), none, fn);
   check("password in other entry's history marks outdated and removable", r.outdated.has(a) && r.recommended === b && ids(r.removable).join() === "a1" && r.evidence.get(a)?.supersededBy === b, r);
@@ -94,13 +95,13 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   check("R16 failure newer than every success is outdated but not removable", r.outdated.has(b) && !r.removable.includes(b), r);
 }
 {
-  const ev: Evidence = { lastUsed: {}, outcomes: { a: { new: { at: 2000, ok: false, rev: "x" } } } };
+  const ev: Evidence = { lastUsed: {}, outcomes: { a: { new: { at: Date.parse("2025-07-01T00:00:00Z"), ok: false, rev: "x" } } } };
   const r = assessGroup(group([oldI, newI], false), ev, fn);
   check("latest failure outdates a variant", r.outdated.has(newI) && r.recommended === oldI, r);
   check("R16 failure without any success record is not removable", r.removable.length === 0, r);
 }
 {
-  const ev: Evidence = { lastUsed: {}, outcomes: { a: { old: { at: 1000, ok: false, rev: "x" }, new: { at: 2000, ok: false, rev: "x" } } } };
+  const ev: Evidence = { lastUsed: {}, outcomes: { a: { old: { at: Date.parse("2025-07-01T00:00:00Z"), ok: false, rev: "x" }, new: { at: Date.parse("2025-07-02T00:00:00Z"), ok: false, rev: "x" } } } };
   const r = assessGroup(group([oldI, newI], false), ev, fn);
   check("all variants failed removes nothing", r.removable.length === 0 && r.recommended === null, r);
 }
@@ -189,6 +190,29 @@ const newI = login("new", { password: "pw2", pwDate: "2025-06-01T00:00:00Z" });
   const x = mk("x1", "pw1"), y = mk("y1", "pw5"), z = mk("z1", "pw6", { history: ["pw1"] });
   r = assessGroup(group([x, y, z], false), rec({ x1: ok(1000), y1: ok(1000) }), fn);
   check("success variant is not outdated by history", !r.outdated.has(x) && !r.removable.includes(x), r);
+}
+
+{
+  // R19: a password set after every piece of evidence against it is never outdated by that evidence
+  const T = Date.parse("2026-03-01T00:00:00Z");
+  const okW = { at: T, ok: true, rev: "x" };
+  // W changed from P_v to P_w in January, worked in March; V went back to P_v in May, then a (false) failure in June
+  const w = login("W", { password: "P_w", pwDate: "2026-01-01T00:00:00Z", history: ["P_v"] });
+  const v = login("V", { password: "P_v", pwDate: "2026-05-01T00:00:00Z", history: ["P_w"] });
+  let r = assessGroup(group([w, v], false), { lastUsed: {}, outcomes: { a: { W: okW, V: { at: Date.parse("2026-06-01T00:00:00Z"), ok: false, rev: "x" } } } }, fn);
+  check("R19 probe: password set after the success, failed later, is not removable", !r.removable.includes(v), r);
+  // one-way history, no failure: V's password set after W's success and after W left P_v
+  const v2 = login("V", { password: "P_v", pwDate: "2026-05-01T00:00:00Z" });
+  r = assessGroup(group([w, v2], false), { lastUsed: {}, outcomes: { a: { W: okW } } }, fn);
+  check("R19 one-way history older than the password: not outdated, not removable", !r.outdated.has(v2) && !r.removable.includes(v2), r);
+  // control: V's password date older than W's success and V in W's history -> outdated and removable as before
+  const v3 = login("V", { password: "P_v", pwDate: "2025-12-01T00:00:00Z" });
+  r = assessGroup(group([w, v3], false), { lastUsed: {}, outcomes: { a: { W: okW } } }, fn);
+  check("R19 control: older password in the winner's history stays outdated and removable", r.recommended === w && r.outdated.has(v3) && r.removable.includes(v3), r);
+  // the winner loop no longer bypasses R16 for a failed variant in the winner's history
+  const v4 = login("V", { password: "P_v", pwDate: "2025-12-01T00:00:00Z" });
+  r = assessGroup(group([w, v4], false), { lastUsed: {}, outcomes: { a: { W: okW, V: { at: T + 1000, ok: false, rev: "x" } } } }, fn);
+  check("R19 winner history does not make a failure newer than every success removable", r.outdated.has(v4) && !r.removable.includes(v4), r);
 }
 
 console.log(failed ? `${failed} FAILED` : "ALL PASSED");
