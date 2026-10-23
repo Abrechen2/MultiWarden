@@ -39,7 +39,7 @@ import {
   VaultData,
   selfHostedUrls,
 } from "../shared/types";
-import { makeMatchContext, uriMatches } from "../shared/uri";
+import { makeMatchContext, matchQuality, uriMatches } from "../shared/uri";
 import { AccountApi, bearerJson, camelize, CLIENT_NAME, decodeJwt, HttpError, sendBody } from "./api";
 import { local, session } from "./store";
 import { buildExport, decryptExport, ExportContext, ExportFormat, plainPasskeys } from "./transfer";
@@ -1281,10 +1281,13 @@ export class VaultService {
   // -------------------------------------------------------------------------------------------
   // matching
 
-  /** Logins matching a URL, most recently used first. `defaultMatch` overrides the default URI match setting. */
+  /**
+   * Logins matching a URL, the most specific saved URI first (path, host with port, hostname, base domain),
+   * then most recently used. `defaultMatch` overrides the default URI match setting.
+   */
   async matchesForUrl(url: string, defaultMatch?: UriMatch): Promise<ItemView[]> {
     await this.ready;
-    const result: ItemView[] = [];
+    const result: { item: ItemView; quality: number }[] = [];
     for (const acc of this.sortedAccounts) {
       const v = await this.ensureVault(acc.key).catch(() => undefined);
       if (!v) continue;
@@ -1292,11 +1295,15 @@ export class VaultService {
       for (const it of v.items) {
         if (it.type !== CipherType.Login || it.deletedDate || it.archivedDate || !it.login) continue;
         const dm = defaultMatch ?? this.defaultMatchFor(acc.key);
-        if (it.login.uris.some((u) => uriMatches(u.uri, u.match, ctx, dm))) result.push(it);
+        const hits = it.login.uris.filter((u) => uriMatches(u.uri, u.match, ctx, dm));
+        if (hits.length) result.push({ item: it, quality: Math.max(...hits.map((u) => matchQuality(u.uri, url))) });
       }
     }
-    result.sort((a, b) => this.lastUsedAt(b) - this.lastUsedAt(a) || a.name.localeCompare(b.name, "de"));
-    return result;
+    result.sort(
+      (a, b) =>
+        b.quality - a.quality || this.lastUsedAt(b.item) - this.lastUsedAt(a.item) || a.item.name.localeCompare(b.item.name, "de"),
+    );
+    return result.map((r) => r.item);
   }
 
   lastUsedAt(i: { accountKey: string; id: string }): number {

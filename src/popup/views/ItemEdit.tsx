@@ -11,7 +11,7 @@ import { call } from "../rpc";
 import { cardBrandFromNumber, itemKey, TYPE_LABEL } from "../util";
 import { EXTRA_FIELDS, FieldDef, IDENTITY_FIELDS } from "./item-fields";
 import { scanTotpQr } from "./qr-scan";
-import { domainLabel, FillScope, hostLabel, matchForNew, scopeOf, withScope } from "../fill-scope";
+import { domainLabel, FillScope, hostLabel, matchForNew, scopeChoices, scopeOf, withScope } from "../fill-scope";
 
 import { inSentence, t, tk } from "../../shared/i18n";
 const MATCH_LABELS: [string, string][] = [
@@ -491,7 +491,9 @@ export function ItemEditView({ route }: { route: Extract<Route, { name: "edit" }
                   <option value="default">
                     {t("Standard: {v}", { v: t(MATCH_LABELS.find(([v]) => v === String(defaultMatch))?.[1] ?? "") })}
                   </option>
-                  <option value="domain">{domainLabel(item.login.uris)}</option>
+                  {scopeChoices(item.login.uris, fillScope).includes("domain") && (
+                    <option value="domain">{domainLabel(item.login.uris)}</option>
+                  )}
                   <option value="host">{hostLabel(item.login.uris)}</option>
                   <option value="custom">{t("Individuell je Website")}</option>
                 </Select>

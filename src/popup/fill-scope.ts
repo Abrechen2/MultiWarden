@@ -3,7 +3,7 @@
 // honour it too; "Standard" leaves the match empty and follows the global setting.
 import { t, tk } from "../shared/i18n";
 import { UriMatch } from "../shared/types";
-import { baseDomain, hostOf } from "../shared/uri";
+import { baseDomain, hostOf, isPortScopedHost } from "../shared/uri";
 
 export type FillScope = "default" | "domain" | "host" | "custom";
 
@@ -42,8 +42,20 @@ function firstUri(uris: Uri[]) {
   return uris.find((u) => u.uri.trim())?.uri ?? "";
 }
 
+/**
+ * Scopes the edit dialog offers. On IPs / localhost / names without a dot "domain" means the same as
+ * "host" (no subdomains, the port counts), so only "host" is offered unless "domain" is already set.
+ */
+export function scopeChoices(uris: Uri[], current: FillScope): FillScope[] {
+  const d = baseDomain(firstUri(uris));
+  const sameAsHost = !!d && isPortScopedHost(d) && current !== "domain";
+  return sameAsHost ? ["default", "host", "custom"] : ["default", "domain", "host", "custom"];
+}
+
 export function domainLabel(uris: Uri[]): string {
   const d = baseDomain(firstUri(uris));
+  // IPs, localhost, names without a dot: no subdomains, and the port is part of the match
+  if (d && isPortScopedHost(d)) return hostLabel(uris);
   return d ? t("{domain} und alle Subdomains", { domain: d }) : t("Ganze Domain inkl. Subdomains");
 }
 
