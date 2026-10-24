@@ -1189,5 +1189,7 @@
  "Nur Einträge einer Organisation können verschoben werden.": "Seuls les éléments d’une organisation peuvent être déplacés.",
  "In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}": "Copié dans votre coffre personnel, l’original est conservé – ces pièces jointes n’ont pas pu être copiées : {names}",
  "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copié dans votre coffre personnel, mais l’original n’a pas pu être supprimé : {error}",
- "In deinen persönlichen Tresor verschoben": "Déplacé vers votre coffre personnel"
+ "In deinen persönlichen Tresor verschoben": "Déplacé vers votre coffre personnel",
+ "Verschieben braucht Bearbeitungsrechte in der Organisation – kopiere den Eintrag stattdessen.": "Le déplacement nécessite des droits de modification dans l’organisation – copiez plutôt l’élément.",
+ "Der Eintrag wurde in der Zwischenzeit geändert – das Original bleibt erhalten.": "L’élément a été modifié entre-temps – l’original est conservé."
 }

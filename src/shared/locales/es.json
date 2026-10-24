@@ -1189,5 +1189,7 @@
  "Nur Einträge einer Organisation können verschoben werden.": "Solo se pueden mover elementos de una organización.",
  "In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}": "Copiado en tu caja fuerte personal, el original se conserva: no se pudieron copiar estos adjuntos: {names}",
  "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copiado en tu caja fuerte personal, pero no se pudo quitar el original: {error}",
- "In deinen persönlichen Tresor verschoben": "Movido a tu caja fuerte personal"
+ "In deinen persönlichen Tresor verschoben": "Movido a tu caja fuerte personal",
+ "Verschieben braucht Bearbeitungsrechte in der Organisation – kopiere den Eintrag stattdessen.": "Mover requiere permisos de edición en la organización; copia el elemento en su lugar.",
+ "Der Eintrag wurde in der Zwischenzeit geändert – das Original bleibt erhalten.": "El elemento se modificó mientras tanto; el original se conserva."
 }

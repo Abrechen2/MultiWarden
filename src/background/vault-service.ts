@@ -1920,26 +1920,45 @@ export class VaultService {
   }
 
   /**
-   * Organization item → personal vault of the same account: a full copy (copyItemToAccount), then the
-   * original goes to the organization's trash. An incomplete copy (failed attachment) keeps the original;
-   * a failed removal (e.g. no permission to delete in the organization) is reported, the copy stays.
+   * Organization item → personal vault of the same account: a full copy (copyItemToAccount) of the current
+   * server version, then the original goes to the organization's trash. The original is kept when the copy is
+   * incomplete (failed attachment) or the item changed on the server while copying; a failed removal (e.g. no
+   * permission to delete in the organization) is reported, the copy stays.
    */
   async moveItemToPersonal(
     accountKey: string,
     itemId: string,
     folderId: string | null,
   ): Promise<{ id: string; attachmentsFailed: string[]; originalRemoved: boolean; removeError?: string }> {
+    // copy what is on the server now, not an older local state
+    await this.sync(accountKey);
     const item = await this.findItem(accountKey, itemId);
     if (!item) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
     if (!item.organizationId) throw new Error(t("Nur Einträge einer Organisation können verschoben werden."));
+    if (!item.edit) throw new Error(t("Verschieben braucht Bearbeitungsrechte in der Organisation – kopiere den Eintrag stattdessen."));
+    const revision = await this.cipherRevision(accountKey, itemId);
     const copy = await this.copyItemToAccount(accountKey, itemId, accountKey, folderId);
     if (copy.attachmentsFailed.length) return { ...copy, originalRemoved: false };
     try {
-      await this.deleteItem(accountKey, itemId, false);
-      return { ...copy, originalRemoved: true };
+      await this.sync(accountKey);
     } catch (e: any) {
       return { ...copy, originalRemoved: false, removeError: e?.message ?? String(e) };
     }
+    if ((await this.cipherRevision(accountKey, itemId)) !== revision)
+      return { ...copy, originalRemoved: false, removeError: t("Der Eintrag wurde in der Zwischenzeit geändert – das Original bleibt erhalten.") };
+    try {
+      await this.api(this.account(accountKey)).send("PUT", `/ciphers/${itemId}/delete`);
+    } catch (e: any) {
+      return { ...copy, originalRemoved: false, removeError: e?.message ?? String(e) };
+    }
+    // the original is in the trash now; a failed refresh must not report it as kept
+    await this.sync(accountKey).catch((e) => console.warn("sync after move failed", e?.message ?? String(e)));
+    return { ...copy, originalRemoved: true };
+  }
+
+  /** Server revision of a cipher as of the last sync (undefined when it is gone). */
+  private async cipherRevision(accountKey: string, itemId: string): Promise<string | undefined> {
+    return ((await this.rawSync(accountKey)).ciphers ?? []).find((c: any) => c.id === itemId)?.revisionDate;
   }
 
   // -------------------------------------------------------------------------------------------

@@ -169,9 +169,12 @@ export function useItemActions(item: ItemView) {
     else toast.show(t("In {account} kopiert", { account: target }));
   };
 
-  /** "move into my personal vault": organization items whose account allows personal items */
+  /** "move into my personal vault": editable organization items whose account allows personal items */
   const canMoveToPersonal =
-    !item.deletedDate && !!item.organizationId && personalItemAllowed(app.accountMap.get(item.accountKey)?.policies, item.type);
+    !item.deletedDate &&
+    !!item.organizationId &&
+    item.edit &&
+    personalItemAllowed(app.accountMap.get(item.accountKey)?.policies, item.type);
   const moveToPersonal = async () => {
     // the organization hides the password: a personal copy would reveal it
     if (!item.viewPassword) {

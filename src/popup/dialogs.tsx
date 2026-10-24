@@ -339,18 +339,25 @@ function MoveToPersonalBox({ item, done }: { item: ItemView; done: (v: MoveResul
     () => (app?.vault.folders ?? []).filter((f) => f.accountKey === item.accountKey).sort((a, b) => a.name.localeCompare(b.name, "de")),
     [app?.vault, item.accountKey],
   );
-  const [folderId, setFolderId] = useState("");
+  // preselect the folder with the same name as the item's organization folder (if any)
+  const srcFolder = app?.vault.folders.find((f) => f.accountKey === item.accountKey && f.id === item.folderId)?.name;
+  const [folderId, setFolderId] = useState(() => folders.find((f) => f.name === srcFolder)?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Enter and a click in the same tick would otherwise start two moves (two copies)
+  const inFlight = useRef(false);
   const n = item.attachments.length;
 
   const submit = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setErr(null);
     const r = await call("moveItemToPersonal", { accountKey: item.accountKey, itemId: item.id, folderId: folderId || null }).catch(
       (e: any) => ({ ok: false, error: e?.message ?? String(e) }) as { ok: false; error: string; id?: undefined },
     );
     setBusy(false);
+    inFlight.current = false;
     if (r.ok && r.id)
       done({ id: r.id, attachmentsFailed: r.attachmentsFailed ?? [], originalRemoved: !!r.originalRemoved, removeError: r.removeError });
     else setErr(r.error ?? t("Verschieben fehlgeschlagen"));
