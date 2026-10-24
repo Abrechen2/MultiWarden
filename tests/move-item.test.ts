@@ -23,7 +23,8 @@ check("org item → other account", canCopyInto({ accountKey: A, organizationId:
 
 (async () => {
   const items: Record<string, any> = {
-    org1: { id: "org1", accountKey: A, organizationId: "org1", name: "Router", edit: true },
+    org1: { id: "org1", accountKey: A, organizationId: "org1", name: "Router", edit: true, revisionDate: "r1" },
+    stale1: { id: "stale1", accountKey: A, organizationId: "org1", name: "Alt", edit: true, revisionDate: "r0" },
     own1: { id: "own1", accountKey: A, organizationId: null, name: "Privat", edit: true },
   };
   const calls: string[] = [];
@@ -36,7 +37,7 @@ check("org item → other account", canCopyInto({ accountKey: A, organizationId:
     return { id: "new1", attachmentsFailed };
   };
   svc.sync = async () => {};
-  svc.rawSync = async () => ({ ciphers: [{ id: "org1", revisionDate: "r1" }] });
+  svc.rawSync = async () => ({ ciphers: [{ id: "org1", revisionDate: "r1" }, { id: "stale1", revisionDate: "r1" }] });
   svc.account = (k: string) => ({ key: k });
   svc.api = () => ({
     send: async (method: string, path: string) => {
@@ -83,6 +84,7 @@ check("org item → other account", canCopyInto({ accountKey: A, organizationId:
   calls.length = 0;
   check("personal item refused", await rejectsWith(move(A, "own1", null), "Organisation"));
   check("unknown item refused", await rejectsWith(move(A, "nope", null), "nicht gefunden"));
+  check("decrypted view older than the server refused", await rejectsWith(move(A, "stale1", null), "aktualisiert"));
   check("refusals change nothing", calls.length === 0, calls);
 
   console.log(failed ? `${failed} FAILED` : "ALL PASSED");

@@ -1191,5 +1191,6 @@
  "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copied into your personal vault, but the original could not be removed: {error}",
  "In deinen persönlichen Tresor verschoben": "Moved to your personal vault",
  "Verschieben braucht Bearbeitungsrechte in der Organisation – kopiere den Eintrag stattdessen.": "Moving needs edit rights in the organization – copy the item instead.",
- "Der Eintrag wurde in der Zwischenzeit geändert – das Original bleibt erhalten.": "The item was changed in the meantime – the original is kept."
+ "Der Eintrag wurde in der Zwischenzeit geändert – das Original bleibt erhalten.": "The item was changed in the meantime – the original is kept.",
+ "Der Tresor konnte nicht aktualisiert werden – bitte synchronisieren und erneut versuchen.": "The vault could not be updated – please sync and try again."
 }

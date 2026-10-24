@@ -1937,6 +1937,9 @@ export class VaultService {
     if (!item.organizationId) throw new Error(t("Nur Einträge einer Organisation können verschoben werden."));
     if (!item.edit) throw new Error(t("Verschieben braucht Bearbeitungsrechte in der Organisation – kopiere den Eintrag stattdessen."));
     const revision = await this.cipherRevision(accountKey, itemId);
+    // the decrypted view must be the synced version (a failed decryption after the sync would leave it older)
+    if (!revision || item.revisionDate !== revision)
+      throw new Error(t("Der Tresor konnte nicht aktualisiert werden – bitte synchronisieren und erneut versuchen."));
     const copy = await this.copyItemToAccount(accountKey, itemId, accountKey, folderId);
     if (copy.attachmentsFailed.length) return { ...copy, originalRemoved: false };
     try {
