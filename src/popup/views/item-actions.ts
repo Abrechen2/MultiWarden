@@ -1,5 +1,6 @@
 import { generateTotp } from "../../crypto/totp";
 import { EventType } from "../../shared/events";
+import { personalItemAllowed } from "../../shared/policies";
 import { CipherType, ItemView } from "../../shared/types";
 import { useApp } from "../app-state";
 import { useToast } from "../components";
@@ -168,5 +169,47 @@ export function useItemActions(item: ItemView) {
     else toast.show(t("In {account} kopiert", { account: target }));
   };
 
-  return { logEvent, copy, copyOptions, fill, canFill, launch, toggleFavorite, guard, canCopyToAccount, copyToAccount };
+  /** "move into my personal vault": organization items whose account allows personal items */
+  const canMoveToPersonal =
+    !item.deletedDate && !!item.organizationId && personalItemAllowed(app.accountMap.get(item.accountKey)?.policies, item.type);
+  const moveToPersonal = async () => {
+    // the organization hides the password: a personal copy would reveal it
+    if (!item.viewPassword) {
+      toast.show(t("Das Passwort dieses Eintrags ist für dich verborgen – er kann nicht kopiert werden."), "error");
+      return;
+    }
+    if (!(await guard())) return;
+    const r = await dialogs.moveToPersonal(item);
+    if (!r) return;
+    await app.reloadVault();
+    if (r.attachmentsFailed.length)
+      toast.show(
+        t("In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}", {
+          names: r.attachmentsFailed.join(", "),
+        }),
+        "error",
+      );
+    else if (!r.originalRemoved)
+      toast.show(
+        t("In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}", { error: r.removeError ?? "" }),
+        "error",
+      );
+    else toast.show(t("In deinen persönlichen Tresor verschoben"));
+    app.go({ name: "item", key: item.accountKey + "::" + r.id });
+  };
+
+  return {
+    logEvent,
+    copy,
+    copyOptions,
+    fill,
+    canFill,
+    launch,
+    toggleFavorite,
+    guard,
+    canCopyToAccount,
+    copyToAccount,
+    canMoveToPersonal,
+    moveToPersonal,
+  };
 }

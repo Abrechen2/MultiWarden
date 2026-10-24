@@ -296,6 +296,11 @@ export interface Rpc {
     req: { accountKey: string; itemId: string; targetAccountKey: string; folderId: string | null };
     res: { ok: boolean; error?: string; id?: string; attachmentsFailed?: string[] };
   };
+  /** organization item → personal vault of the same account; the original goes to the organization's trash */
+  moveItemToPersonal: {
+    req: { accountKey: string; itemId: string; folderId: string | null };
+    res: { ok: boolean; error?: string; id?: string; attachmentsFailed?: string[]; originalRemoved?: boolean; removeError?: string };
+  };
   // inline menu
   inlineMenuToken: { req: { url: string; kind: MenuKind; opid?: string }; res: { token: string | null } };
   inlineMenuData: { req: { token: string }; res: InlineMenuData };

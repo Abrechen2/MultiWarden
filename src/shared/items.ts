@@ -30,3 +30,8 @@ export function newLoginItem(
     attachments: [],
   };
 }
+
+/** Whether an item may be copied into the personal vault of `targetKey`: another account always, the own account only for organization items. */
+export function canCopyInto(item: Pick<ItemView, "accountKey" | "organizationId">, targetKey: string): boolean {
+  return targetKey !== item.accountKey || !!item.organizationId;
+}

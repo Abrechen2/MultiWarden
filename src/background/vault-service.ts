@@ -39,6 +39,7 @@ import {
   VaultData,
   selfHostedUrls,
 } from "../shared/types";
+import { canCopyInto } from "../shared/items";
 import { makeMatchContext, matchQuality, uriMatches } from "../shared/uri";
 import { AccountApi, bearerJson, camelize, CLIENT_NAME, decodeJwt, HttpError, sendBody } from "./api";
 import { local, session } from "./store";
@@ -1870,12 +1871,12 @@ export class VaultService {
     targetKey: string,
     targetFolderId: string | null,
   ): Promise<{ id: string; attachmentsFailed: string[] }> {
-    if (sourceKey === targetKey) throw new Error(t("Bitte ein anderes Konto wählen"));
     const target = this.account(targetKey);
     if (!this.isUnlocked(sourceKey) || !this.isUnlocked(targetKey)) throw new Error(t("Konto ist gesperrt"));
     const item = await this.findItem(sourceKey, itemId);
     const raw = ((await this.rawSync(sourceKey)).ciphers ?? []).find((c: any) => c.id === itemId);
     if (!item || !raw) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
+    if (!canCopyInto(item, targetKey)) throw new Error(t("Bitte ein anderes Konto wählen"));
     if (item.deletedDate) throw new Error(t("Einträge im Papierkorb können nicht kopiert werden"));
     // the organization hides the password from this user: a copy would reveal it
     if (!item.viewPassword) throw new Error(t("Das Passwort dieses Eintrags ist für dich verborgen – er kann nicht kopiert werden."));
@@ -1916,6 +1917,29 @@ export class VaultService {
     }
     await this.sync(targetKey).catch((e) => console.warn("sync after copy failed", e?.message ?? String(e)));
     return { id: created.id, attachmentsFailed };
+  }
+
+  /**
+   * Organization item → personal vault of the same account: a full copy (copyItemToAccount), then the
+   * original goes to the organization's trash. An incomplete copy (failed attachment) keeps the original;
+   * a failed removal (e.g. no permission to delete in the organization) is reported, the copy stays.
+   */
+  async moveItemToPersonal(
+    accountKey: string,
+    itemId: string,
+    folderId: string | null,
+  ): Promise<{ id: string; attachmentsFailed: string[]; originalRemoved: boolean; removeError?: string }> {
+    const item = await this.findItem(accountKey, itemId);
+    if (!item) throw new Error(t("Eintrag nicht gefunden – bitte synchronisieren"));
+    if (!item.organizationId) throw new Error(t("Nur Einträge einer Organisation können verschoben werden."));
+    const copy = await this.copyItemToAccount(accountKey, itemId, accountKey, folderId);
+    if (copy.attachmentsFailed.length) return { ...copy, originalRemoved: false };
+    try {
+      await this.deleteItem(accountKey, itemId, false);
+      return { ...copy, originalRemoved: true };
+    } catch (e: any) {
+      return { ...copy, originalRemoved: false, removeError: e?.message ?? String(e) };
+    }
   }
 
   // -------------------------------------------------------------------------------------------

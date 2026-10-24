@@ -1182,5 +1182,12 @@
  "Auf diesem Gerät seit {date} nicht genutzt": "Inutilisé sur cet appareil depuis le {date}",
  "In mehreren Konten gleiches Passwort": "Même mot de passe dans plusieurs comptes",
  "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "Le même mot de passe dans différents comptes. La comparaison se fait uniquement en mémoire.",
- "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "« Jamais utilisé » n'a de sens qu'après 12 mois d'utilisation de MultiWarden ici."
+ "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "« Jamais utilisé » n'a de sens qu'après 12 mois d'utilisation de MultiWarden ici.",
+ "In persönlichen Tresor verschieben": "Déplacer vers le coffre personnel",
+ "„{name}“ wird in deinen persönlichen Tresor kopiert. Danach kommt das Original in den Papierkorb der Organisation und kann dort wiederhergestellt werden.": "« {name} » est copié dans votre coffre personnel. L’original passe ensuite dans la corbeille de l’organisation et peut y être restauré.",
+ "Verschieben fehlgeschlagen": "Échec du déplacement",
+ "Nur Einträge einer Organisation können verschoben werden.": "Seuls les éléments d’une organisation peuvent être déplacés.",
+ "In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}": "Copié dans votre coffre personnel, l’original est conservé – ces pièces jointes n’ont pas pu être copiées : {names}",
+ "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copié dans votre coffre personnel, mais l’original n’a pas pu être supprimé : {error}",
+ "In deinen persönlichen Tresor verschoben": "Déplacé vers votre coffre personnel"
 }

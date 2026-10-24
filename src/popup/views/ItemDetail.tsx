@@ -797,6 +797,17 @@ function ItemMoreMenu({ item }: { item: ItemView }) {
               <span data-testid="menu-copy-account">{t("In anderes Konto kopieren")}</span>
             </MenuItem>
           )}
+          {actions.canMoveToPersonal && (
+            <MenuItem
+              icon="copy"
+              onClick={() => {
+                setOpen(false);
+                actions.moveToPersonal();
+              }}
+            >
+              <span data-testid="menu-move-personal">{t("In persönlichen Tresor verschieben")}</span>
+            </MenuItem>
+          )}
           {item.edit && !item.deletedDate && (
             <MenuItem icon="archive" onClick={() => archive(!item.archivedDate)}>
               <span data-testid="menu-archive">{item.archivedDate ? t("Aus dem Archiv holen") : t("Archivieren")}</span>

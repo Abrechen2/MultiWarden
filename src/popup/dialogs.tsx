@@ -14,6 +14,13 @@ export interface CopyResult {
   id: string;
   attachmentsFailed: string[];
 }
+/** Result of "move into my personal vault" (the copy exists; the original is gone only if originalRemoved). */
+export interface MoveResult {
+  id: string;
+  attachmentsFailed: string[];
+  originalRemoved: boolean;
+  removeError?: string;
+}
 interface ConfirmOpts {
   title: string;
   message: string;
@@ -27,6 +34,8 @@ interface DialogApi {
   prompt: (o: { title: string; label: string; okLabel?: string; initial?: string }) => Promise<string | null>;
   /** choose target account and folder, then copy (resolves null when cancelled) */
   copyToAccount: (item: ItemView) => Promise<CopyResult | null>;
+  /** choose a folder, then move an organization item into the own personal vault (null when cancelled) */
+  moveToPersonal: (item: ItemView) => Promise<MoveResult | null>;
 }
 
 const Ctx = createContext<DialogApi>({
@@ -34,6 +43,7 @@ const Ctx = createContext<DialogApi>({
   reprompt: async () => false,
   prompt: async () => null,
   copyToAccount: async () => null,
+  moveToPersonal: async () => null,
 });
 export const useDialogs = () => useContext(Ctx);
 
@@ -41,7 +51,8 @@ type Dlg =
   | { kind: "confirm"; o: ConfirmOpts; resolve: (v: boolean) => void }
   | { kind: "reprompt"; accountKey: string; resolve: (v: boolean) => void }
   | { kind: "prompt"; o: { title: string; label: string; okLabel?: string; initial?: string }; resolve: (v: string | null) => void }
-  | { kind: "copyToAccount"; item: ItemView; resolve: (v: CopyResult | null) => void };
+  | { kind: "copyToAccount"; item: ItemView; resolve: (v: CopyResult | null) => void }
+  | { kind: "moveToPersonal"; item: ItemView; resolve: (v: MoveResult | null) => void };
 
 const overlay = {
   position: "fixed",
@@ -90,6 +101,7 @@ export function DialogHost({ children }: { children: ComponentChildren }) {
     },
     prompt: (o) => new Promise((resolve) => setDlg({ kind: "prompt", o, resolve })),
     copyToAccount: (item) => new Promise((resolve) => setDlg({ kind: "copyToAccount", item, resolve })),
+    moveToPersonal: (item) => new Promise((resolve) => setDlg({ kind: "moveToPersonal", item, resolve })),
   };
 
   const close = () => setDlg(null);
@@ -120,6 +132,15 @@ export function DialogHost({ children }: { children: ComponentChildren }) {
             )}
             {dlg.kind === "copyToAccount" && (
               <CopyToAccountBox
+                item={dlg.item}
+                done={(v) => {
+                  close();
+                  dlg.resolve(v);
+                }}
+              />
+            )}
+            {dlg.kind === "moveToPersonal" && (
+              <MoveToPersonalBox
                 item={dlg.item}
                 done={(v) => {
                   close();
@@ -306,6 +327,85 @@ function CopyToAccountBox({ item, done }: { item: ItemView; done: (v: CopyResult
         <button class="btn btn-primary" type="submit" disabled={busy || !target} data-testid="copy-ok">
           {busy && <Spinner />}
           {t("Kopieren")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function MoveToPersonalBox({ item, done }: { item: ItemView; done: (v: MoveResult | null) => void }) {
+  const app = useContext(AppCtx);
+  const folders = useMemo(
+    () => (app?.vault.folders ?? []).filter((f) => f.accountKey === item.accountKey).sort((a, b) => a.name.localeCompare(b.name, "de")),
+    [app?.vault, item.accountKey],
+  );
+  const [folderId, setFolderId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const n = item.attachments.length;
+
+  const submit = async () => {
+    setBusy(true);
+    setErr(null);
+    const r = await call("moveItemToPersonal", { accountKey: item.accountKey, itemId: item.id, folderId: folderId || null }).catch(
+      (e: any) => ({ ok: false, error: e?.message ?? String(e) }) as { ok: false; error: string; id?: undefined },
+    );
+    setBusy(false);
+    if (r.ok && r.id)
+      done({ id: r.id, attachmentsFailed: r.attachmentsFailed ?? [], originalRemoved: !!r.originalRemoved, removeError: r.removeError });
+    else setErr(r.error ?? t("Verschieben fehlgeschlagen"));
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!busy) submit();
+      }}
+      data-testid="move-personal-dialog"
+    >
+      <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>{t("In persönlichen Tresor verschieben")}</h3>
+      <p class="muted" style={{ margin: "0 0 12px" }}>
+        {t(
+          "„{name}“ wird in deinen persönlichen Tresor kopiert. Danach kommt das Original in den Papierkorb der Organisation und kann dort wiederhergestellt werden.",
+          { name: item.name },
+        )}
+      </p>
+      <label class="field">
+        <span class="lbl">{t("Ordner")}</span>
+        <div class="input-wrap">
+          <select
+            value={folderId}
+            disabled={busy}
+            onChange={(e) => setFolderId((e.target as HTMLSelectElement).value)}
+            data-testid="move-folder"
+          >
+            <option value="">{t("Kein Ordner")}</option>
+            {folders.map((f) => (
+              <option value={f.id} key={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </label>
+      {n > 0 && (
+        <p class="small muted" style={{ margin: "0 0 8px" }}>
+          {n === 1 ? t("1 Anhang wird mitkopiert") : t("{n} Anhänge werden mitkopiert", { n })}
+        </p>
+      )}
+      {err && (
+        <div class="error-text" data-testid="move-error">
+          {err}
+        </div>
+      )}
+      <div class="row-gap" style={{ justifyContent: "flex-end", marginTop: 14 }}>
+        <button type="button" class="btn btn-ghost" disabled={busy} onClick={() => done(null)}>
+          {t("Abbrechen")}
+        </button>
+        <button class="btn btn-primary" type="submit" disabled={busy} data-testid="move-ok">
+          {busy && <Spinner />}
+          {t("Verschieben")}
         </button>
       </div>
     </form>

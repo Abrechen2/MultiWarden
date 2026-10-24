@@ -1182,5 +1182,12 @@
  "Auf diesem Gerät seit {date} nicht genutzt": "Sin usar en este dispositivo desde el {date}",
  "In mehreren Konten gleiches Passwort": "Misma contraseña en varias cuentas",
  "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "La misma contraseña en cuentas distintas. La comparación se hace solo en memoria.",
- "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "«Nunca usado» solo es significativo cuando MultiWarden se usa aquí desde hace 12 meses."
+ "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "«Nunca usado» solo es significativo cuando MultiWarden se usa aquí desde hace 12 meses.",
+ "In persönlichen Tresor verschieben": "Mover a la caja fuerte personal",
+ "„{name}“ wird in deinen persönlichen Tresor kopiert. Danach kommt das Original in den Papierkorb der Organisation und kann dort wiederhergestellt werden.": "«{name}» se copia en tu caja fuerte personal. Después, el original pasa a la papelera de la organización y puede restaurarse allí.",
+ "Verschieben fehlgeschlagen": "Error al mover",
+ "Nur Einträge einer Organisation können verschoben werden.": "Solo se pueden mover elementos de una organización.",
+ "In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}": "Copiado en tu caja fuerte personal, el original se conserva: no se pudieron copiar estos adjuntos: {names}",
+ "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copiado en tu caja fuerte personal, pero no se pudo quitar el original: {error}",
+ "In deinen persönlichen Tresor verschoben": "Movido a tu caja fuerte personal"
 }

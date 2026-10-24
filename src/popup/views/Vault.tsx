@@ -700,6 +700,17 @@ export function ItemRow({ item, suggestion, multi }: { item: ItemView; suggestio
                 <span data-testid="menu-copy-account">{t("In anderes Konto kopieren")}</span>
               </MenuItem>
             )}
+            {actions.canMoveToPersonal && (
+              <MenuItem
+                icon="copy"
+                onClick={() => {
+                  setMoreOpen(false);
+                  actions.moveToPersonal();
+                }}
+              >
+                <span data-testid="menu-move-personal">{t("In persönlichen Tresor verschieben")}</span>
+              </MenuItem>
+            )}
             {multi && acc && (
               <>
                 <div class="menu-sep" />

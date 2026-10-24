@@ -1182,5 +1182,12 @@
  "Auf diesem Gerät seit {date} nicht genutzt": "Not used on this device since {date}",
  "In mehreren Konten gleiches Passwort": "Same password in several accounts",
  "Dasselbe Passwort in verschiedenen Konten. Der Vergleich geschieht nur im Speicher.": "The same password in different accounts. The comparison happens in memory only.",
- "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "“Never used” only becomes meaningful once MultiWarden has been used here for 12 months."
+ "„Nie genutzt“ wird erst aussagekräftig, wenn MultiWarden hier seit 12 Monaten genutzt wird.": "“Never used” only becomes meaningful once MultiWarden has been used here for 12 months.",
+ "In persönlichen Tresor verschieben": "Move to personal vault",
+ "„{name}“ wird in deinen persönlichen Tresor kopiert. Danach kommt das Original in den Papierkorb der Organisation und kann dort wiederhergestellt werden.": "“{name}” is copied into your personal vault. The original then goes to the organization's trash and can be restored there.",
+ "Verschieben fehlgeschlagen": "Move failed",
+ "Nur Einträge einer Organisation können verschoben werden.": "Only organization items can be moved.",
+ "In deinen persönlichen Tresor kopiert, das Original bleibt erhalten – diese Anhänge konnten nicht kopiert werden: {names}": "Copied into your personal vault, the original is kept – these attachments could not be copied: {names}",
+ "In deinen persönlichen Tresor kopiert, aber das Original konnte nicht entfernt werden: {error}": "Copied into your personal vault, but the original could not be removed: {error}",
+ "In deinen persönlichen Tresor verschoben": "Moved to your personal vault"
 }

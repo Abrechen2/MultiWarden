@@ -635,6 +635,15 @@ const handlers: Record<string, Handler> = {
       return { ok: false, error: e?.message ?? String(e) };
     }
   },
+  async moveItemToPersonal(args) {
+    try {
+      await svc.touch();
+      const r = await svc.moveItemToPersonal(String(args.accountKey), String(args.itemId), args.folderId ? String(args.folderId) : null);
+      return { ok: true, ...r };
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? String(e) };
+    }
+  },
   async attachmentDownload(args) {
     await svc.touch();
     return svc.attachmentDownload(args.accountKey, args.itemId, args.attachmentId);
