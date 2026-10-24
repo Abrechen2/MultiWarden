@@ -3,9 +3,9 @@
     "multiwarden@abrechen2.de": {
       "updates": [
         {
-          "version": "1.6.0",
-          "update_link": "https://github.com/Abrechen2/MultiWarden/releases/download/v1.6.0/MultiWarden-1.6.0.xpi",
-          "update_hash": "sha256:3a4c18594143b0164ae3f666d0466d155a360e2b8add88a166d0fd1ff5daefea"
+          "version": "1.6.1",
+          "update_link": "https://github.com/Abrechen2/MultiWarden/releases/download/v1.6.1/MultiWarden-1.6.1.xpi",
+          "update_hash": "sha256:dab2bc2253bed9f7532b60c4c7ce096a8fb102a7de732c9c0f6172e3443e9e98"
         }
       ]
     }
