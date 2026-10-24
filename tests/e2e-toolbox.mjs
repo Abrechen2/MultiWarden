@@ -99,16 +99,40 @@ const newLogin = (accountKey, name, username, uri, extra = {}) =>
   await p.waitForTimeout(200);
   check("account B: no dup.test group", (await p.locator('[data-testid="dup-group"]', { hasText: "dup.test" }).count()) === 0);
   await p.selectOption('[data-testid="tool-account"]', A);
-  await p.waitForTimeout(200);
-  await group.locator('[data-testid="dup-clean"]').click();
+  await p.waitForTimeout(500);
+  // different passwords, no login outcomes yet: the newer one is "probably current", nothing is bulk-removable
+  const neu = group.locator('[data-testid="dup-item"]', { hasText: "Shop (neu)" });
+  check("newer password recommended", ((await neu.textContent()) ?? "").includes("vermutlich aktuell"));
+  check("evidence line shown", (await group.locator('[data-testid="dup-evidence"]').count()) === 2);
+  check("no bulk clean-up without strong evidence", (await group.locator('[data-testid="dup-clean"]').count()) === 0);
+  await group.locator('[data-testid="dup-item"]', { hasText: "Shop (alt)" }).locator('[data-testid="dup-trash"]').click();
   await p.click('[data-testid="confirm-ok"]');
   await p.waitForTimeout(1200);
   check("group resolved", (await p.locator('[data-testid="dup-group"]', { hasText: "dup.test" }).count()) === 0);
   const v = await rpc("getVault");
   check(
-    "older entry in the trash, newest kept",
+    "older entry in the trash, newer kept",
     !!v.items.find((i) => i.name === "Shop (alt)")?.deletedDate && !v.items.find((i) => i.name === "Shop (neu)")?.deletedDate,
   );
+
+  // identical copies (same password): "Bereinigen" removes the extra copy, the confirmation names it
+  const same = { login: { username: "copy-user", password: "same-PW", uris: [{ uri: "https://copy.test/", match: null }], passkeys: 0 } };
+  await newLogin(A, "Kopie 1", "copy-user", "https://copy.test/", same);
+  await newLogin(A, "Kopie 2", "copy-user", "https://copy.test/", same);
+  await p.click('[data-testid="tool-duplicates"]');
+  await p.selectOption('[data-testid="tool-account"]', A);
+  await p.waitForTimeout(800);
+  const copies = p.locator('[data-testid="dup-group"]', { hasText: "copy.test" });
+  check("identical copies grouped", (await copies.locator('[data-testid="dup-item"]').count()) === 2);
+  await copies.locator('[data-testid="dup-clean"]').click();
+  const msg = (await p.textContent('[role="dialog"]')) ?? "";
+  check("confirmation lists the copy that goes", msg.includes("Kopie 1") || msg.includes("Kopie 2"), msg);
+  await p.screenshot({ path: `${SHOTS}/toolbox-clean-confirm.png` });
+  await p.click('[data-testid="confirm-ok"]');
+  await p.waitForTimeout(1200);
+  const v2 = await rpc("getVault");
+  const left = v2.items.filter((i) => (i.name === "Kopie 1" || i.name === "Kopie 2") && !i.deletedDate);
+  check("one copy kept, one in the trash", left.length === 1, left.map((i) => i.name));
   await p.close();
 }
 

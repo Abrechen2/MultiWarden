@@ -127,11 +127,11 @@ const settings = (s) => rpc("setSettings", s);
       v.brand === "VI",
     JSON.stringify([r, v]),
   );
+  // the hosted payment frame is on another origin (127.0.0.1 vs. localhost): card data goes there only
+  // after the user confirms (audit hardening), a plain fill leaves it empty
   check(
-    "hosted payment frame filled (number, MM / JJ, CVC)",
-    (await pay.inputValue("#pf-num")) === "4111111111111111" &&
-      (await pay.inputValue("#pf-exp")) === "08 / 29" &&
-      (await pay.inputValue("#pf-cvc")) === "123",
+    "cross-origin payment frame not filled without confirmation",
+    (await pay.inputValue("#pf-num")) === "" && (await pay.inputValue("#pf-exp")) === "" && (await pay.inputValue("#pf-cvc")) === "",
     [await pay.inputValue("#pf-num"), await pay.inputValue("#pf-exp"), await pay.inputValue("#pf-cvc")].join("|"),
   );
   check(
@@ -253,7 +253,8 @@ const settings = (s) => rpc("setSettings", s);
   if (m) {
     const first = await m.locator('[data-testid="inline-generated"]').textContent();
     await m.locator('[data-testid="inline-regenerate"]').click();
-    await p.waitForTimeout(400);
+    // the inline menu re-arms after a re-render (clickjacking guard): wait past the arming delay
+    await p.waitForTimeout(900);
     shown = await m.locator('[data-testid="inline-generated"]').textContent();
     check("regenerate gives a new password", shown && shown !== first && shown.length >= 14, first + " → " + shown);
     await p.screenshot({ path: `${SHOTS}/inline-generator.png` });
