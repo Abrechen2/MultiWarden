@@ -40,7 +40,7 @@
 - Produces: `findDuplicates(items: ItemView[], mode?: DuplicateMode): DuplicateGroup[]` — now accepts items of several accounts; `sameSharedItem(a: ItemView, b: ItemView): boolean` (same `organizationId` and `id`, both non-empty) exported from `src/shared/duplicates.ts`.
 
 - [ ] **Step 1: Write the failing tests** (in `tests/duplicates-compare.test.ts`, using the file's existing item helper)
-  - `IP logins on different ports are not duplicates`: two logins user `admin`, URIs `http://10.0.0.5:8080` and `http://10.0.0.5:5765` → `findDuplicates(...)` has 0 groups.
+  - `IP logins on different ports are not duplicates`: two logins user `admin`, URIs `http://10.0.0.5:8080` and `http://10.0.0.5:9443` → `findDuplicates(...)` has 0 groups.
   - `IP logins on the same port are duplicates`: `http://10.0.0.5:8080` and `https://10.0.0.5:8080/login` → 1 group.
   - `domain logins still group across ports`: `https://nas.example.de:8443`, `https://nas.example.de:5001` → 1 group.
   - `passwords differing only in whitespace differ`: passwords `"pw"` and `"pw "` → `compareGroup` entry `password` has `same === false`; group `samePassword === false`.

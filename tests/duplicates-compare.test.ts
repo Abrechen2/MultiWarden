@@ -87,7 +87,7 @@ const folderName = (i: ItemView) => (i.folderId === "f1" ? "Privat" : i.folderId
 
   // port rule, exact secrets, cross-account grouping
   const ip = (id: string, uri: string, o: Partial<ItemView> = {}) => ({ ...login(id, { username: "admin", password: "pw", uris: [uri] }), ...o });
-  check("IP logins on different ports are not duplicates", findDuplicates([ip("p1", "http://10.0.0.5:8080"), ip("p2", "http://10.0.0.5:5765")]).length === 0);
+  check("IP logins on different ports are not duplicates", findDuplicates([ip("p1", "http://10.0.0.5:8080"), ip("p2", "http://10.0.0.5:9443")]).length === 0);
   check("IP logins on the same port are duplicates", findDuplicates([ip("p1", "http://10.0.0.5:8080"), ip("p2", "https://10.0.0.5:8080/login")]).length === 1);
   check(
     "domain logins still group across ports",

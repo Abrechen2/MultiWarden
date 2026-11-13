@@ -16,44 +16,44 @@ const check = (n: string, ok: boolean, info: any = "") => {
 const dom = (cipherUri: string, url: string) => uriMatches(cipherUri, null, makeMatchContext(url, []), UriMatch.Domain);
 
 // base domain on IPs / localhost / single-label hosts: the port counts
-check("IP same port", dom("https://192.168.178.36:5765", "https://192.168.178.36:5765/login") === true);
-check("IP other port", dom("https://192.168.178.36:8080", "https://192.168.178.36:5765/login") === false);
-check("IP default port vs explicit port", dom("http://192.168.178.36", "http://192.168.178.36:5765/") === false);
-check("IP explicit port vs default port", dom("http://192.168.178.36:8080", "http://192.168.178.36/") === false);
-check("IP default ports of http and https are one service", dom("http://192.168.178.36", "https://192.168.178.36/") === true);
-check("IP without scheme, default port", dom("192.168.178.36", "https://192.168.178.36/Main") === true);
-check("IP without scheme, explicit port", dom("192.168.178.36:5765", "https://192.168.178.36:5765/") === true);
-check("IP without scheme, other port", dom("192.168.178.36:8080", "https://192.168.178.36:5765/") === false);
+check("IP same port", dom("https://192.0.2.10:9443", "https://192.0.2.10:9443/login") === true);
+check("IP other port", dom("https://192.0.2.10:8080", "https://192.0.2.10:9443/login") === false);
+check("IP default port vs explicit port", dom("http://192.0.2.10", "http://192.0.2.10:9443/") === false);
+check("IP explicit port vs default port", dom("http://192.0.2.10:8080", "http://192.0.2.10/") === false);
+check("IP default ports of http and https are one service", dom("http://192.0.2.10", "https://192.0.2.10/") === true);
+check("IP without scheme, default port", dom("192.0.2.10", "https://192.0.2.10/Main") === true);
+check("IP without scheme, explicit port", dom("192.0.2.10:9443", "https://192.0.2.10:9443/") === true);
+check("IP without scheme, other port", dom("192.0.2.10:8080", "https://192.0.2.10:9443/") === false);
 check("IPv6 other port", dom("http://[fd00::1]:8080", "http://[fd00::1]:9000/") === false);
 check("IPv6 same port", dom("http://[fd00::1]:8080", "http://[fd00::1]:8080/") === true);
 check("localhost other port", dom("http://localhost:3000", "http://localhost:8080/") === false);
-check("single-label host other port", dom("http://unraid2:8080", "http://unraid2:9000/") === false);
-check("single-label host same port", dom("http://unraid2:8080", "http://unraid2:8080/x") === true);
+check("single-label host other port", dom("http://nas:8080", "http://nas:9000/") === false);
+check("single-label host same port", dom("http://nas:8080", "http://nas:8080/x") === true);
 // normal domains keep Bitwarden's base-domain behaviour
 check("domain other port still matches", dom("https://nas.example.de:8443", "https://nas.example.de:5001/") === true);
 check("domain subdomain still matches", dom("https://example.de", "https://login.example.de/") === true);
 // explicit match types are untouched
 check(
   "Host match unchanged",
-  uriMatches("https://192.168.178.36:8080", UriMatch.Host, makeMatchContext("https://192.168.178.36:5765/", []), UriMatch.Domain) ===
+  uriMatches("https://192.0.2.10:8080", UriMatch.Host, makeMatchContext("https://192.0.2.10:9443/", []), UriMatch.Domain) ===
     false,
 );
 check(
   "StartsWith ignores the port rule only by its own logic",
-  uriMatches("https://192.168.178.36:5765/app", UriMatch.StartsWith, makeMatchContext("https://192.168.178.36:5765/app/x", []), UriMatch.Domain),
+  uriMatches("https://192.0.2.10:9443/app", UriMatch.StartsWith, makeMatchContext("https://192.0.2.10:9443/app/x", []), UriMatch.Domain),
 );
 
 // item view: an IP entry is filled on that host and port only, not "and all subdomains"
 {
-  const d = describeScope([{ uri: "https://192.168.178.36:5765/login" }], UriMatch.Domain);
-  check("scope label of an IP entry names host and port", d === "Nur 192.168.178.36:5765", d);
+  const d = describeScope([{ uri: "https://192.0.2.10:9443/login" }], UriMatch.Domain);
+  check("scope label of an IP entry names host and port", d === "Nur 192.0.2.10:9443", d);
   const n = describeScope([{ uri: "https://example.de" }], UriMatch.Domain);
   check("scope label of a domain unchanged", n === "example.de und alle Subdomains", n);
 }
 
 // edit dialog: on an IP entry "domain" and "host" mean the same, only "host" is offered
 {
-  const ip = [{ uri: "https://192.168.178.36:5765" }];
+  const ip = [{ uri: "https://192.0.2.10:9443" }];
   const c = (uris: any[], cur: any) => JSON.stringify(scopeChoices(uris, cur));
   check("IP entry offers no separate domain scope", c(ip, "default") === JSON.stringify(["default", "host", "custom"]), c(ip, "default"));
   check("IP entry keeps a domain scope that is already set", c(ip, "domain") === JSON.stringify(["default", "domain", "host", "custom"]));

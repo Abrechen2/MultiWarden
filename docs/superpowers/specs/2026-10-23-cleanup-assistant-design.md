@@ -19,7 +19,7 @@ gives a cautious recommendation; it never declares an entry safe to delete.
 1. Fix two defects in the duplicate check:
    - `duplicateKeys()` uses `hostnameOf()` and ignores the port. Since 1.5.2 matching treats a port on IPs /
      localhost / single-label hosts as a separate service (`isPortScopedHost` in `src/shared/uri.ts`), so
-     `10.0.0.5:8080` and `10.0.0.5:5765` with the same username must not be duplicates. Normal domains keep
+     `10.0.0.5:8080` and `10.0.0.5:9443` with the same username must not be duplicates. Normal domains keep
      grouping by hostname (port ignored), consistent with matching.
    - `compareGroup()` trims every value; for secret fields (password, TOTP, card number/code, private key,
      secret custom fields) leading/trailing whitespace is significant. Compare secrets untrimmed.
