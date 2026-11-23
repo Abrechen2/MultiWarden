@@ -6,6 +6,7 @@ import { newLoginItem } from "../shared/items";
 import type { LoginCapture, NotificationData } from "../shared/messages";
 import { baseDomain, isBlockedUrl } from "../shared/uri";
 import { CipherType, ItemView } from "../shared/types";
+import { forgetFill, recentFill } from "./filled";
 import { ATTEMPT_TTL, classifyOutcome, type Attempt, type PageState } from "./login-attempt";
 import { itemRev, LoginOutcomes } from "./login-outcomes";
 import { addNeverAskDomain, addNeverDomain, isNeverAskDomain, isNeverDomain } from "./never-domains";
@@ -102,6 +103,7 @@ export class NotificationService {
       const a = await session.get<TrackedAttempt>("attempt:" + tabId).catch(() => undefined);
       if (a) await this.dropAttempt(a).catch(() => {});
       await session.remove("notifyUser:" + tabId).catch(() => {});
+      await forgetFill(tabId).catch(() => {});
     });
   }
 
@@ -232,6 +234,10 @@ export class NotificationService {
     const items = (await this.matching(url)).filter(
       (i) => (i.login?.username ?? "").trim().toLowerCase() === user && i.login?.password === password,
     );
+    // the entry just filled into this tab, even when it is stored for another address
+    const filled = await this.filledItem(tabId, url, username);
+    if (filled && filled.login?.password === password && !items.some((i) => i.accountKey === filled.accountKey && i.id === filled.id))
+      items.push(filled);
     if (!items.length) return undefined;
     return {
       id: crypto.randomUUID(),
@@ -431,6 +437,18 @@ export class NotificationService {
     return (await this.svc.matchesForUrl(url)).filter((i) => i.type === CipherType.Login && i.login && !i.deletedDate);
   }
 
+  /**
+   * The login filled into this tab shortly before, on the same origin, when the submitted username is its
+   * own (or none was captured, e.g. a password-only step).
+   */
+  private async filledItem(tabId: number, url: string, username: string): Promise<ItemView | undefined> {
+    const f = await recentFill(tabId, url);
+    const item = f && (await this.svc.findItem(f.accountKey, f.itemId));
+    if (!item || item.type !== CipherType.Login || !item.login || item.deletedDate) return undefined;
+    const user = username.trim().toLowerCase();
+    return !user || (item.login.username ?? "").trim().toLowerCase() === user ? item : undefined;
+  }
+
   async data(p: Pending): Promise<NotificationData> {
     const s = this.svc.settings;
     const pub = this.svc.publicAccounts();
@@ -450,6 +468,18 @@ export class NotificationService {
       return base;
     }
     const items = await this.matching(p.url);
+    // filled shortly before: that entry decides, not every login of the page with this username
+    const filled = await this.filledItem(p.tabId, p.url, p.username);
+    if (filled) {
+      // a change-password form must carry the filled entry's password as the old one
+      const own = !p.currentPassword || filled.login!.password === p.currentPassword;
+      if (!own || filled.login!.password === p.password || !s.promptUpdate || !filled.edit) return base;
+      const a = pub.find((x) => x.key === filled.accountKey);
+      if (!a) return base;
+      base.kind = "update";
+      base.targets = [{ accountKey: filled.accountKey, itemId: filled.id, name: filled.name, accountLabel: a.label, accountColor: a.color }];
+      return base;
+    }
     const sameUser = (i: ItemView) => (i.login?.username ?? "").trim().toLowerCase() === p.username.toLowerCase();
     let candidates = items.filter(sameUser);
     if (p.currentPassword) {

@@ -6,6 +6,7 @@ import { EventType } from "../shared/events";
 import type { CollectResult, FillData, InlineMenuData, InlineMenuItem, MenuKind } from "../shared/messages";
 import { CipherType, FieldType, ItemView } from "../shared/types";
 import { hostnameOf, isBlockedUrl, isFillableUrl } from "../shared/uri";
+import { recordFill } from "./filled";
 import { initialsOf, VaultService } from "./vault-service";
 
 import { t } from "../shared/i18n";
@@ -144,6 +145,8 @@ export async function fillItem(svc: VaultService, tabId: number, item: ItemView,
   for (const tx of targets) filled += await fillFrame(tabId, tx.frameId, data, tx.result!.origin);
   if (!filled) return { ok: false, error: t("Es konnten keine Felder ausgefüllt werden") };
   await svc.markUsed(item.accountKey, item.id);
+  // the save prompt of the following submission belongs to this entry
+  await recordFill(tabId, item, targets[0].result!.url);
   svc.events.collect(item.accountKey, EventType.CipherClientAutofilled, item);
   return { ok: true, totp };
 }

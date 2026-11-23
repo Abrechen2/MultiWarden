@@ -199,6 +199,11 @@ export interface Rpc {
     req: { accountKey: string; itemId: string; tabId?: number; force?: boolean };
     res: { ok: boolean; error?: string; code?: "mismatch" | "insecure"; totpCopied?: string };
   };
+  /** "Ausfüllen und speichern": fill, then add the page's origin to the login */
+  autofillAndSave: {
+    req: { accountKey: string; itemId: string; tabId?: number };
+    res: { ok: boolean; error?: string; saveError?: string; totpCopied?: string };
+  };
   saveItem: { req: SaveItemRequest; res: { ok: boolean; error?: string; item?: ItemView } };
   deleteItem: { req: { accountKey: string; itemId: string; permanent?: boolean }; res: { ok: boolean; error?: string } };
   restoreItem: { req: { accountKey: string; itemId: string }; res: { ok: boolean; error?: string } };

@@ -649,6 +649,17 @@ export function ItemRow({ item, suggestion, multi }: { item: ItemView; suggestio
                 {t("Ausfüllen")}
               </MenuItem>
             )}
+            {actions.canFillAndSave && (
+              <MenuItem
+                icon="fill"
+                onClick={() => {
+                  setMoreOpen(false);
+                  actions.fillAndSave();
+                }}
+              >
+                <span data-testid="menu-fill-save">{t("Ausfüllen und speichern")}</span>
+              </MenuItem>
+            )}
             {actions.launch && (
               <MenuItem
                 icon="external"

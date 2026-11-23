@@ -4,6 +4,7 @@ import { LiveSync } from "./live-sync";
 import { EventType } from "../shared/events";
 import type { RpcMessage, RpcName, Rpc } from "../shared/messages";
 import { isBlockedUrl, isFillableUrl } from "../shared/uri";
+import { withSiteUri } from "../shared/items";
 import { CipherType, type OutcomeRecord } from "../shared/types";
 import {
   activeTab,
@@ -354,6 +355,26 @@ const handlers: Record<string, Handler> = {
     const r = await fillItem(svc, tab.id, item, { force: !!args.force });
     if (r.ok && r.totp && svc.settings.autoCopyTotp) return { ok: true, totpCopied: r.totp };
     return { ok: r.ok, error: r.error, code: r.code };
+  },
+  async autofillAndSave(args) {
+    await svc.ready;
+    await svc.touch();
+    const tab = await activeTab(args.tabId);
+    if (!tab?.id || !isFillableUrl(tab.url)) return { ok: false, error: t("Kein aktiver Tab") };
+    const item = await svc.findItem(args.accountKey, args.itemId);
+    if (!item?.login || item.deletedDate) return { ok: false, error: t("Eintrag nicht gefunden") };
+    if (!item.edit) return { ok: false, error: t("Keine Berechtigung zum Bearbeiten") };
+    // the user picked this entry for the page in the popup and confirmed it
+    const r = await fillItem(svc, tab.id, item, { force: true });
+    if (!r.ok) return { ok: false, error: r.error };
+    const totpCopied = r.totp && svc.settings.autoCopyTotp ? r.totp : undefined;
+    if (svc.itemMatchesUrl(item, tab.url!)) return { ok: true, totpCopied };
+    try {
+      await svc.saveItem(item.accountKey, withSiteUri(item, tab.url!), false);
+      return { ok: true, totpCopied };
+    } catch (e: any) {
+      return { ok: true, totpCopied, saveError: e?.message ?? String(e) };
+    }
   },
   async saveItem(args) {
     await svc.touch();

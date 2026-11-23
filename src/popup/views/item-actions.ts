@@ -7,7 +7,7 @@ import { useToast } from "../components";
 import { useDialogs } from "../dialogs";
 import type { IconName } from "../icons";
 import { call } from "../rpc";
-import { copyToClipboard, launchUrl } from "../util";
+import { copyToClipboard, itemKey, launchUrl } from "../util";
 import { EXTRA_FIELDS } from "./item-fields";
 
 import { t } from "../../shared/i18n";
@@ -129,6 +129,47 @@ export function useItemActions(item: ItemView) {
     else toast.show(t("Ausgefüllt"));
   };
 
+  /** "Ausfüllen und speichern": a login that does not match the open page yet */
+  const canFillAndSave =
+    item.type === CipherType.Login && item.edit && !item.deletedDate && !!app.page.host && !app.page.itemIds.includes(itemKey(item));
+  const fillAndSave = async () => {
+    if (!(await guard())) return;
+    let origin = app.page.host;
+    try {
+      origin = new URL(app.page.url).origin;
+    } catch {
+      /* keep the host */
+    }
+    const ok = await dialogs.confirm({
+      title: t("Ausfüllen und speichern?"),
+      message: t(
+        "{origin} wird als Website zu „{name}“ hinzugefügt. Danach wird dieser Eintrag hier vorgeschlagen und beim Speichern-Hinweis erkannt. Nur fortfahren, wenn du der Seite vertraust.",
+        { origin, name: item.name || t("(ohne Namen)") },
+      ),
+      okLabel: t("Ausfüllen und speichern"),
+    });
+    if (!ok) return;
+    const r = await call("autofillAndSave", { accountKey: item.accountKey, itemId: item.id });
+    if (!r.ok) {
+      toast.show(r.error ?? t("Ausfüllen fehlgeschlagen"), "error");
+      return;
+    }
+    if (r.totpCopied) {
+      try {
+        await copyToClipboard(r.totpCopied, clearSec);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (r.saveError) {
+      toast.show(t("Ausgefüllt, aber die Website konnte nicht gespeichert werden: {error}", { error: r.saveError }), "error");
+      return;
+    }
+    await app.reloadVault();
+    if (!app.popout) window.close();
+    else toast.show(t("Ausgefüllt und gespeichert"));
+  };
+
   const firstUri = item.login?.uris.map((u) => launchUrl(u.uri)).find(Boolean);
   const launch = firstUri
     ? () => {
@@ -207,6 +248,8 @@ export function useItemActions(item: ItemView) {
     copyOptions,
     fill,
     canFill,
+    fillAndSave,
+    canFillAndSave,
     launch,
     toggleFavorite,
     guard,

@@ -783,6 +783,17 @@ function ItemMoreMenu({ item }: { item: ItemView }) {
       </button>
       {open && (
         <Popover anchor={ref.current} onClose={() => setOpen(false)} align="end">
+          {actions.canFillAndSave && (
+            <MenuItem
+              icon="fill"
+              onClick={() => {
+                setOpen(false);
+                actions.fillAndSave();
+              }}
+            >
+              <span data-testid="menu-fill-save">{t("Ausfüllen und speichern")}</span>
+            </MenuItem>
+          )}
           <MenuItem icon="copy" onClick={clone}>
             <span data-testid="menu-clone">{t("Klonen")}</span>
           </MenuItem>

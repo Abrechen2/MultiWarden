@@ -31,6 +31,14 @@ export function newLoginItem(
   };
 }
 
+/** "Ausfüllen und speichern": a copy of the login with the page's origin as an additional website (once). */
+export function withSiteUri(item: ItemView, pageUrl: string): ItemView {
+  const origin = new URL(pageUrl).origin;
+  const uris = item.login?.uris ?? [];
+  if (!item.login || uris.some((u) => u.uri.replace(/\/+$/, "") === origin)) return item;
+  return { ...item, login: { ...item.login, uris: [...uris, { uri: origin, match: null }] } };
+}
+
 /** Whether an item may be copied into the personal vault of `targetKey`: another account always, the own account only for organization items. */
 export function canCopyInto(item: Pick<ItemView, "accountKey" | "organizationId">, targetKey: string): boolean {
   return targetKey !== item.accountKey || !!item.organizationId;
